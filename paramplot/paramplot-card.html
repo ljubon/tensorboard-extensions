@@ -28,17 +28,17 @@ limitations under the License.
 -->
 <dom-module id="paramplot-card">
   <template>
-    <tf-card-heading title="[[tag]]">
-    </tf-card-heading>
-    <template is="dom-repeat" items="[[parameters]]" as="param">
+    <tf-card-heading title="[[tag]]"></tf-card-heading>
+    <template is="dom-repeat" items="[[parameterNames]]" as="parameterName">
       <tf-line-chart-data-loader
         active="[[active]]"
-        data-series="[[dataToLoad.map(d => d.run)]]"
+        data-series="[[dataToLoad.map(d => d.parameter)]]"
         data-to-load="[[dataToLoad]]"
         get-data-load-name="[[_getDataLoadName]]"
-        get-data-load-url="[[getDataLoadUrlMap]]"
-        request-data="[[requestDataMap]]"
+        get-data-load-url="[[getDataLoadUrl]]"
+        request-data="[[requestData]]"
         load-data-callback="[[_loadDataCallback]]"
+        request-manager="requestManager"
         load-key="[[tag]]"
       > 
       </tf-line-chart-data-loader>
@@ -60,58 +60,52 @@ limitations under the License.
     </style>
   </template>
   <script>
-    "use strict" ;
-
+    "use strict";
     Polymer({
       is: "paramplot-card",
       properties: {
         tag: String,
-        parameters: Object,
+        parameterNames: Array,
         active: Boolean,
+        requestManager: Object,
         ignoreYOutliers: Boolean,
         dataToLoad: Object, // map<string, data>
-        getDataLoadUrlMap: {
+        getDataLoadUrl: {
           type: Function,
-          value: function(param){
-                return function(obj){
-                  console.log(param);
-                  console.log(obj.tag);
-                  return tf_backend.getRouter().pluginRoute(
-                      'paramdatabytag',
-                      '/paramdatabytag',
-                      new URLSearchParams({
-                        tag: obj.tag,
-                        parameter: param,
-                      }));
-                }
+          value: (datum) => {
+            var url = tf_backend.getRouter().pluginRoute(
+              'paramplot',
+              '/paramdatabytag',
+              new URLSearchParams({
+                tag: datum.tag,
+                parameter: 'num_layers',
+              }));
+            return url;
           },
         },
-        // A function called to fetch the scalars data from the backend.
-        // Should receive a {tag, run, experiment} object and return
-        // a promise resolving with the fetched scalars. The default
-        // implementation of this function executes:
-        // this.requestManager.request(this.getDataLoadUrl({tag, run, experiment}))
-        requestDataMap: {
+        requestData: {
           type: Function,
-          value: (parameter) => function(obj) {
-            const f = this.getDataLoadUrlMap('num_layers');
-            console.log(typeof this.getDataLoadUrlMap);
-            console.log(this.getDataLoadUrlMap)
-            console.log(typeof f);
-            console.log(obj)
-            this.requestManager.request(this.getDataLoadUrlMap({tag:obj.tag, run:obj.run, experiment:obj.experiment}));
-          }
+          value: (datum) => {
+            var url = tf_backend.getRouter().pluginRoute(
+              'paramplot',
+              '/paramdatabytag',
+              new URLSearchParams({
+                tag: datum.tag,
+                parameter: 'num_layers',
+              }));
+            datum.requestManager.request(url);
+          },
         },
         _loadDataCallback: {
           type: Object,
-          value: function() {
-            return (scalarChart, metadatum, data) => {
+          value: () => {
+            return (scalarChart, datum, data) => {
               const formattedData = data.map(datum => ({
                 wall_time: new Date(datum[0] * 1000),
                 step: datum[1],
                 scalar: datum[2],
               }));
-              console.log('loading data into chart')
+              console.log('loading data into chart');
               const name = this._getSeriesNameFromDatum(metadatum);
               scalarChart.setSeriesMetadata(name, metadatum);
               scalarChart.setSeriesData(name, formattedData);
@@ -124,11 +118,13 @@ limitations under the License.
           type: Object,  // function: string => string
           value: () => tf_color_scale.runsColorScale,
         },
-        requestManager: Object,
         _canceller: {
           type: Object,
           value: () => new tf_backend.Canceller(),
         },
+      },
+      _getSeriesNameFromDatum({tag, parameter}) {
+        return JSON.stringify([tag, parameter]);
       },
       attached() {
         // Defer reloading until after we're attached, because that ensures that
@@ -140,14 +136,14 @@ limitations under the License.
       reload() {
         this._fetchParameters().then(() => {
           this.querySelectorAll('tf-line-chart-data-loader').forEach(chart => {
-            console.log('reloading all the charts after having fetched the parameters')
+            console.log('reloading all the charts after having fetched the parameters');
             chart.reload();
           });
         });
       },
       redraw() {
         this.querySelectorAll('tf-line-chart-data-loader').forEach(chart => {
-            console.log('redrawing all the charts')
+            console.log('redrawing all the charts');
             chart.redraw();
           });
       },
@@ -162,9 +158,9 @@ limitations under the License.
             return;
           }
           const backendData = result.value;
-          this.parameters = backendData.payload;
-          console.log("printing the parameters which were returned by the plugin (stored in the run parameters config file)")
-          console.log(this.parameters)
+          this.parameterNames = backendData.payload;
+          console.log("printing the parameters which were returned by the plugin (stored in the run parameters config file)");
+          console.log(this.parameterNames);
         });
         return this.requestManager.request(url).then(updateData);
       },

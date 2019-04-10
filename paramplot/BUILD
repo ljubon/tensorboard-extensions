@@ -1,19 +1,6 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 package(default_visibility = ["//visibility:public"])
 
+load("@org_tensorflow_tensorboard//tensorboard/defs:defs.bzl", "tensorboard_webcomponent_library")
 load("@org_tensorflow_tensorboard//tensorboard/defs:web.bzl", "tf_web_library")
 
 licenses(["notice"])  # Apache 2.0
@@ -57,24 +44,53 @@ py_library(
 tf_web_library(
     name = "paramplot_dashboard",
     srcs = [
-        "paramplot-card.html",
         "paramplot-dashboard.html",
     ],
     path = "/paramplot",
     deps = [
-        "@org_polymer_iron_icon",
-        "@org_polymer_paper_icon_button",
-        "@org_polymer_paper_input",
+        ":paramplot_card",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_categorization_utils",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_color_scale",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_dashboard_common",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_data_selector:type",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:lodash",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_paginated_view",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_runs_selector",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_storage",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard:registry",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_utils",
+        "@org_tensorflow_tensorboard//tensorboard/components/vz_chart_helpers",
+        "@org_polymer_iron_collapse",
+        "@org_polymer_paper_button",
+        "@org_polymer_paper_checkbox",
+        "@org_polymer_paper_dropdown_menu",
+        "@org_polymer_paper_input",
+        "@org_polymer_paper_item",
+        "@org_polymer_paper_menu",
+        "@org_polymer_paper_slider",
+        "@org_polymer_paper_styles",
+    ],
+)
+
+tf_web_library(
+    name = "paramplot_card",
+    srcs = [
+        "paramplot-card.html",
+    ],
+    path = "/paramplot",
+    deps = [
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_dashboard_common",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",
+        "@org_polymer_paper_dropdown_menu",
+        "@org_polymer_paper_icon_button",
+        "@org_polymer_paper_item",
+        "@org_polymer_paper_listbox",
+        "@org_polymer_paper_menu",
+        "@org_polymer_paper_menu_button",
     ],
 )

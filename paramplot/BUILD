@@ -83,6 +83,7 @@ tf_web_library(
     deps = [
         "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_color_scale",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_dashboard_common",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",

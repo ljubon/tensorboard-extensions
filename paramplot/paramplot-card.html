@@ -20,6 +20,7 @@ limitations under the License.
 <link rel="import" href="../paper-menu/paper-menu.html">
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../tf-backend/tf-backend.html">
+<link rel="import" href="../tf-color-scale/tf-color-scale.html">
 <link rel="import" href="../tf-line-chart-data-loader/tf-line-chart-data-loader.html">
 <link rel="import" href="../tf-card-heading/tf-card-heading.html">
 <link rel="import" href="../tf-dashboard-common/tf-downloader.html">
@@ -30,18 +31,18 @@ limitations under the License.
 -->
 <dom-module id="paramplot-card">
 <template>
-  <tf-card-heading
-    tag="[[tag]]"
-  ></tf-card-heading>
+  <tf-card-heading>[[tag]] against [[parameter]]</tf-card-heading>
   <div id="tf-line-chart-data-loader-container">
     <tf-line-chart-data-loader
       active="[[active]]"
-      data-series="[[_getDataSeries()]]"
+      data-series="[[_getDataSeries(dataToLoad)]]"
+      color-scale="[[colorScale]]"
       data-to-load="[[dataToLoad]]"
       get-data-load-name="[[_getDataLoadName]]"
       get-data-load-url="[[getDataLoadUrl]]"
       request-data="[[requestData]]"
       load-data-callback="[[_loadDataCallback]]"
+      ignore-y-outliers="[[ignoreYOutliers]]"
       load-key="[[tag]]"
       request-manager="[[requestManager]]"
       x-type="[[xType]]"
@@ -61,8 +62,8 @@ limitations under the License.
       height: 400px;
     }
     #tf-line-chart-data-loader-container {
-      height: 200px;
-      width: 100%;
+      height: 400px;
+      width: 400px;
     }
     tf-card-heading {
       display: block;
@@ -75,6 +76,7 @@ limitations under the License.
       is: 'paramplot-card',
       properties: {
         tag: String,
+        parameter: String,
         /**
          * @type {Array<Object>}
          */
@@ -85,6 +87,25 @@ limitations under the License.
         xType: String,
         active: Boolean,
         requestManager: Object,
+        ignoreYOutliers: {
+          type: Boolean,
+          value: false,
+        },
+        colorScale: {
+          type: Object,
+          value: function(){
+            return {
+              scale: (name) => {
+                const store = tf_backend.runsStore;
+                const colorScale = new tf_color_scale.ColorScale();
+                const updateRunsColorScale = () => colorScale.setDomain([name]);
+                store.addListener(updateRunsColorScale);
+                updateRunsColorScale();
+                return (domain) => colorScale.getColor(domain);
+              }
+            }
+          },
+        },
         // This function is called when data is received from the backend.
         _loadDataCallback: {
           type: Object,
@@ -95,7 +116,11 @@ limitations under the License.
                 step: datum[1],
                 scalar: datum[2],
               }));
+              console.log('loadDataCallback');
+              console.log(formattedData);
+              console.log(datum);
               const name = this._getSeriesNameFromDatum(datum);
+              console.log(name);
               scalarChart.setSeriesMetadata(name, datum);
               scalarChart.setSeriesData(name, formattedData);
             };
@@ -151,9 +176,8 @@ limitations under the License.
           chart.resetDomain();
         }
       },
-      _getDataSeries() {
-          return ["num_layers"];
-        // return this.dataToLoad.map(d => this._getSeriesNameFromDatum(d));
+      _getDataSeries: (dataToLoad) => {
+        return dataToLoad.map(d => JSON.stringify([d.tag, d.parameter]));
       },
       // name is a stable identifier for a series.
       _getSeriesNameFromDatum({tag, parameter}) {
@@ -161,7 +185,7 @@ limitations under the License.
       },
       // title is a visible string of a series for the UI.
       _getSeriesDisplayNameFromDatum(datum) {
-        return `${datum.tag}-${datum.parameter}`;
+        return `${datum.tag.toUpperCase()} against ${datum.parameter.toUpperCase()}`;
       },
   });
 </script>

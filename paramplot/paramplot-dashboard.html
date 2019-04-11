@@ -85,6 +85,7 @@ limitations under the License.
                                     data-to-load="[[_getDataToLoadFromSeriesElement(series)]]"
                                     request-manager="[[_requestManager]]"
                                     tag="[[taggedSeries.tag]]"
+                                    parameter="[[series.parameter]]"
                                     x-type="[[_xType]]"
                                 ></paramplot-card>
                           </template>
@@ -101,21 +102,6 @@ limitations under the License.
 
     <style include="dashboard-style"></style>
     <style>
-      #tooltip-sorting {
-        align-items: center;
-        display: flex;
-        font-size: 14px;
-        margin-top: 15px;
-      }
-      #tooltip-sorting paper-dropdown-menu {
-        margin-left: 10px;
-        --paper-input-container-focus-color: var(--tb-orange-strong);
-        width: 105px;
-      }
-      .line-item {
-        display: block;
-        padding-top: 5px;
-      }
       .no-data-warning {
         max-width: 540px;
         margin: 80px auto 0 auto;
@@ -138,10 +124,6 @@ limitations under the License.
         _xType: {
           type: String,
           value: vz_chart_helpers.XType.STEP,
-        },
-        _selectedRuns: {
-          type: Array,
-          value: () => [],
         },
         _runToTag: Object,
         _parameters: Array,
@@ -167,15 +149,13 @@ limitations under the License.
         tf_dashboard_common.ArrayUpdateHelper,
       ],
       observers: [
-        '_updateCategories(_runToTag, _selectedRuns)',
+        '_updateCategories(_runToTag, _categoriesDomReady)',
       ],
       _getDataToLoadFromSeriesElement(seriesElement){
         return [seriesElement];
       },
       _getCategoryKey(category) {
-        return category.metadata.type ==
-            tf_categorization_utils.CategoryType.SEARCH_RESULTS ?
-                '' : category.name;
+        return category.name
       },
       _getPaneOpened(category) {
         return this._paneOpened[this._getCategoryKey(category)];
@@ -225,12 +205,17 @@ limitations under the License.
           chart.reload();
         });
       },
-      _updateCategories(runToTag, selectedRuns) {
+      _updateCategories(runToTag, _categoriesDomReady) {
+        if(!_categoriesDomReady){
+          return;
+        }
+        console.log('_updateCategories');
+        const runsKeys = Object.keys(runToTag);
         console.log(runToTag);
-        let categories = tf_categorization_utils.categorizeTags(runToTag, selectedRuns);
+        console.log(runsKeys);
+        let categories = tf_categorization_utils.categorizeTags(runToTag, runsKeys);
         console.log(categories);
         categories.forEach(category => {
-            console.log(category);
             category.items = category.items.map(item => ({
                 tag: item.tag,
                 series: this._parameters.map(parameter => ({parameter, tag: item.tag})),
@@ -241,7 +226,7 @@ limitations under the License.
     });
     tf_tensorboard.registerDashboard({
       plugin: 'paramplot',
-      elementName: 'paramplot-dashboard',
+      elementName: 'paramplot-dashboard'
     });
   </script>
 </dom-module>

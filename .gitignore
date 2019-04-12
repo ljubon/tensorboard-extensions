@@ -5,3 +5,4 @@ ranjeevmenv
 *.egg-info/
 .vscode
 paramplotdemo
+node_modules

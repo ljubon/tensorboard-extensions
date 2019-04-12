@@ -206,7 +206,7 @@ limitations under the License.
         });
       },
       _updateCategories(runToTag, _categoriesDomReady) {
-        if(!_categoriesDomReady){
+        if(!_categoriesDomReady || !this._parameters){
           return;
         }
         console.log('_updateCategories');

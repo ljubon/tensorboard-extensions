@@ -113,7 +113,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
     for run in self._get_valid_runs():
       tensor_events = self._multiplexer.Tensors(run, tag)
       param_value = self._runparams_json[run][parameter]
-      processed_events = processed_events + [(ev.wall_time, param_value, tf.make_ndarray(ev.tensor_proto).item()) for ev in tensor_events] 
+      processed_events = processed_events + [{"run": run, "payload": (ev.wall_time, param_value, tf.make_ndarray(ev.tensor_proto).item())} for ev in tensor_events] 
     return processed_events
 
   @wrappers.Request.application

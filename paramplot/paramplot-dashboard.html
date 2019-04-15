@@ -209,12 +209,8 @@ limitations under the License.
         if(!_categoriesDomReady || !this._parameters){
           return;
         }
-        console.log('_updateCategories');
         const runsKeys = Object.keys(runToTag);
-        console.log(runToTag);
-        console.log(runsKeys);
         let categories = tf_categorization_utils.categorizeTags(runToTag, runsKeys);
-        console.log(categories);
         categories.forEach(category => {
             category.items = category.items.map(item => ({
                 tag: item.tag,

@@ -24,7 +24,6 @@ limitations under the License.
 <link rel="import" href="../tf-line-chart-data-loader/tf-line-chart-data-loader.html">
 <link rel="import" href="../tf-card-heading/tf-card-heading.html">
 <link rel="import" href="../tf-dashboard-common/tf-downloader.html">
-<link rel="import" href="../lib/simple-chart.html">
 
 <!--
   A card that handles loading data (at the right times), rendering a scalar
@@ -32,24 +31,23 @@ limitations under the License.
 -->
 <dom-module id="paramplot-card">
 <template>
-  <tf-card-heading>[[tag]] against [[parameter]]</tf-card-heading>
+  <tf-card-heading>[[_getSeriesDisplayNameFromDatum(tag, parameter)]]</tf-card-heading>
   <div id="tf-line-chart-data-loader-container">
-    <simple-chart name="basichello" data="[[data]]"></simple-chart>
-<!--    <tf-line-chart-data-loader-->
-<!--      active="[[active]]"-->
-<!--      data-series="[[_getDataSeries(dataToLoad)]]"-->
-<!--      color-scale="[[colorScale]]"-->
-<!--      data-to-load="[[dataToLoad]]"-->
-<!--      get-data-load-name="[[_getDataLoadName]]"-->
-<!--      get-data-load-url="[[getDataLoadUrl]]"-->
-<!--      request-data="[[requestData]]"-->
-<!--      load-data-callback="[[_loadDataCallback]]"-->
-<!--      ignore-y-outliers="[[ignoreYOutliers]]"-->
-<!--      load-key="[[tag]]"-->
-<!--      request-manager="[[requestManager]]"-->
-<!--      x-type="[[xType]]"-->
-<!--    >-->
-<!--    </tf-line-chart-data-loader>-->
+    <tf-line-chart-data-loader
+      active="[[active]]"
+      data-series="[[_getDataSeries(dataToLoad)]]"
+      data-to-load="[[dataToLoad]]"
+      color-scale="[[colorScale]]"
+      get-data-load-name="[[_getDataLoadName]]"
+      get-data-load-url="[[getDataLoadUrl]]"
+      request-data="[[requestData]]"
+      load-data-callback="[[_loadDataCallback]]"
+      ignore-y-outliers="[[ignoreYOutliers]]"
+      load-key="[[tag]]"
+      request-manager="[[requestManager]]"
+      x-type="[[xType]]"
+    >
+    </tf-line-chart-data-loader>
   </div>
   <style>
     :host {
@@ -93,40 +91,26 @@ limitations under the License.
           type: Boolean,
           value: false,
         },
-        data: {
-          type: DataPoint[],
-          value: () => [{x: 2, y: Math.floor((Math.random() * 10000) + 1)}, {x: 4, y: Math.floor((Math.random() * 10000) + 1)}, {x: 8, y: Math.floor((Math.random() * 10000) + 1)}]
-        },
         colorScale: {
           type: Object,
-          value: function(){
-            return {
-              scale: (name) => {
-                const store = tf_backend.runsStore;
-                const colorScale = new tf_color_scale.ColorScale();
-                const updateRunsColorScale = () => colorScale.setDomain([name]);
-                store.addListener(updateRunsColorScale);
-                updateRunsColorScale();
-                return (domain) => colorScale.getColor(domain);
-              }
-            }
-          },
+          value: function() {
+            return new Plottable.Scales.Color().range(d3.schemeCategory10);
+          }
         },
         // This function is called when data is received from the backend.
         _loadDataCallback: {
           type: Object,
           value: function() {
             return (scalarChart, datum, data) => {
-              const formattedData = data.map(datum => ({
-                wall_time: new Date(datum[0]*1000),
-                step: datum[1],
-                scalar: datum[2],
-              }));
-              console.log('loadDataCallback');
-              console.log(formattedData);
-              console.log(datum);
+              const formattedData = data.map(data => {
+                const datum = data.payload;
+                return {
+                  wall_time: new Date(datum[0]*1000),
+                  step: datum[1],
+                  scalar: datum[2],
+                }
+              }).sort((a,b) => a.wall_time - b.wall_time);
               const name = this._getSeriesNameFromDatum(datum);
-              console.log(name);
               scalarChart.setSeriesMetadata(name, datum);
               scalarChart.setSeriesData(name, formattedData);
             };
@@ -147,12 +131,6 @@ limitations under the License.
             }
           },
         },
-        // A function called to fetch the scalars data from the backend.
-        // Should receive a {tag, run, experiment} object and return
-        // a promise resolving with the fetched scalars. The default
-        // implementation of this function executes:
-        // this.requestManager.request(
-        //      this.getDataLoadUrl({tag, run, experiment})
         requestData: Function,
         _getDataLoadName: {
           type: Function,
@@ -183,15 +161,16 @@ limitations under the License.
         }
       },
       _getDataSeries: (dataToLoad) => {
-        return dataToLoad.map(d => JSON.stringify([d.tag, d.parameter]));
+        const series = dataToLoad.map(d => JSON.stringify([d.tag, d.parameter]));
+        return series;
       },
       // name is a stable identifier for a series.
       _getSeriesNameFromDatum({tag, parameter}) {
         return JSON.stringify([tag, parameter]);
       },
       // title is a visible string of a series for the UI.
-      _getSeriesDisplayNameFromDatum(datum) {
-        return `${datum.tag.toUpperCase()} against ${datum.parameter.toUpperCase()}`;
+      _getSeriesDisplayNameFromDatum(tag, parameter) {
+        return `${tag.toUpperCase()} against ${parameter.toUpperCase()}`;
       },
   });
 </script>

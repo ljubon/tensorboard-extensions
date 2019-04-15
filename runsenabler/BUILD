@@ -3,18 +3,18 @@ package(default_visibility = ["//visibility:public"])
 load("@org_tensorflow_tensorboard//tensorboard/defs:web.bzl", "tf_web_library")
 
 py_library(
-    name = "paramplot_loader",
-    srcs = ["paramplot_loader.py"],
+    name = "runsenabler_loader",
+    srcs = ["runsenabler_loader.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":paramplot_plugin",
+        ":runsenabler_plugin",
         "@org_tensorflow_tensorboard//tensorboard/plugins:base_plugin",
     ],
 )
 
 py_library(
-    name = "paramplot_plugin",
-    srcs = ["paramplot_plugin.py"],
+    name = "runsenabler_plugin",
+    srcs = ["runsenabler_plugin.py"],
     srcs_version = "PY2AND3",
     deps = [
         "@org_pocoo_werkzeug",
@@ -25,27 +25,13 @@ py_library(
     ],
 )
 
-py_binary(
-    name = "paramplot_demo",
-    srcs = ["paramplot_demo.py"],
-    srcs_version = "PY2AND3",
-    deps = [":paramplot_summary"],
-)
-
-py_library(
-    name = "paramplot_summary",
-    srcs = ["paramplot_summary.py"],
-    srcs_version = "PY2AND3",
-)
-
 tf_web_library(
-    name = "paramplot_dashboard",
+    name = "runsenabler_dashboard",
     srcs = [
-        "paramplot-dashboard.html",
+        "runsenabler-dashboard.html",
     ],
-    path = "/paramplot",
+    path = "/runsenabler",
     deps = [
-        ":paramplot_card",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_categorization_utils",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_color_scale",
@@ -68,27 +54,5 @@ tf_web_library(
         "@org_polymer_paper_menu",
         "@org_polymer_paper_slider",
         "@org_polymer_paper_styles",
-    ],
-)
-
-tf_web_library(
-    name = "paramplot_card",
-    srcs = [
-        "paramplot-card.html",
-    ],
-    path = "/paramplot",
-    deps = [
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_color_scale",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_dashboard_common",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
-        "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",
-        "@org_polymer_paper_dropdown_menu",
-        "@org_polymer_paper_icon_button",
-        "@org_polymer_paper_item",
-        "@org_polymer_paper_listbox",
-        "@org_polymer_paper_menu",
-        "@org_polymer_paper_menu_button",
     ],
 )

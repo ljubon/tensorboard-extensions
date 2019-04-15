@@ -1,17 +1,22 @@
 {
     "run1":{
-        "num_layers": 2
+        "num_layers": 2,
+        "mystery_parameter": 1.1
     },
     "run2":{
-        "num_layers": 4
+        "num_layers": 4,
+        "mystery_parameter": 2.3
     },
     "run3":{
-        "num_layers": 8
+        "num_layers": 8,
+        "mystery_parameter": 5.4
     },
     "run4":{
-        "num_layers": 16
+        "num_layers": 16,
+        "mystery_parameter": 10.74
     },
     "run5":{
-        "num_layers": 32
+        "num_layers": 32,
+        "mystery_parameter": 8.29
     }
 }

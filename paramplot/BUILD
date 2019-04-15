@@ -86,7 +86,6 @@ tf_web_library(
         "@org_tensorflow_tensorboard//tensorboard/components/tf_dashboard_common",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",
-        "//lib:simple_chart",
         "@org_polymer_paper_dropdown_menu",
         "@org_polymer_paper_icon_button",
         "@org_polymer_paper_item",

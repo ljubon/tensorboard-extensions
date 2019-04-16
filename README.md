@@ -88,13 +88,7 @@ For example, let’s create a `Greeter` plugin. It provides a greeter `op` metho
 Here’s the code; we’ll explain it below:
 
 
-<!--ensure_synchronized_to:greeter_summary.py-->
 ```python
-"""Simple demo which greets several people.
-
-This module provides summaries for the Greeter plugin.
-"""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -102,15 +96,15 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-PLUGIN_NAME = 'greeter'
+PLUGIN_NAME = 'paramplot'
 
 
 def op(name,
-       guest,
+       value,
        display_name=None,
        description=None,
        collections=None):
-  """Create a TensorFlow summary op to greet the given guest.
+  """Create a TensorFlow summary op to record data associated with a particular the given guest.
 
   Arguments:
     name: A name for this summary operation.
@@ -139,47 +133,13 @@ def op(name,
       plugin_data=tf.SummaryMetadata.PluginData(
           plugin_name=PLUGIN_NAME))
 
-  message = tf.string_join(['Hello, ', guest, '!'])
-
   # Return a summary op that is properly configured.
   return tf.summary.tensor_summary(
       name,
-      message,
+      value,
       summary_metadata=summary_metadata,
       collections=collections)
-
-
-def pb(tag, guest, display_name=None, description=None):
-  """Create a greeting summary for the given guest.
-
-  Arguments:
-    tag: The string tag associated with the summary.
-    guest: The string name of the guest to greet.
-    display_name: If set, will be used as the display name in
-      TensorBoard. Defaults to `tag`.
-    description: A longform readable description of the summary data.
-      Markdown is supported.
-    """
-  message = 'Hello, %s!' % guest
-  tensor = tf.make_tensor_proto(message, dtype=tf.string)
-
-  # We have no metadata to store, but we do need to add a plugin_data entry
-  # so that we know this summary is associated with the greeter plugin.
-  # We could use this entry to pass additional metadata other than the
-  # PLUGIN_NAME by using the content parameter.
-  summary_metadata = tf.SummaryMetadata(
-      display_name=display_name,
-      summary_description=description,
-      plugin_data=tf.SummaryMetadata.PluginData(
-          plugin_name=PLUGIN_NAME))
-
-  summary = tf.Summary()
-  summary.value.add(tag=tag,
-                    metadata=summary_metadata,
-                    tensor=tensor)
-  return summary
 ```
-<!--end_ensure_synchronized_to:greeter_summary.py-->
 
 The `op` and `pb` methods above are two different ways of creating the same data: `Summary` protobufs containing `"Hello, $guest"` as a string tensor, with a unique `tag`, and with the appropriate metadata.
 
@@ -236,7 +196,6 @@ Subsequently, with knowledge of which tags are relevant, your plugin can retriev
 Below, `GreeterPlugin` demonstrates how a very basic plugin works. To peruse the code of a real plugin, see [`TextPlugin`](https://github.com/tensorflow/tensorboard/blob/master/tensorboard/plugins/text/text_plugin.py) or any of the plugins within TensorBoard’s GitHub repository.
 
 
-<!--ensure_synchronized_to:greeter_plugin.py-->
 ```python
 import tensorflow as tf
 import numpy as np
@@ -350,7 +309,6 @@ class GreeterPlugin(base_plugin.TBPlugin):
                 ev in tensor_events]
     return http_util.Respond(request, response, 'application/json')
 ```
-<!--end_ensure_synchronized_to:greeter_plugin.py-->
 
 
 Note that the TensorBoard team is actively developing SQL databases as a backend

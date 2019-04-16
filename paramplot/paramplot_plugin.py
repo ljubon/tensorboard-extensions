@@ -1,17 +1,3 @@
-# Copyright 2017 Google Inc. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -25,6 +11,7 @@ from tensorboard.backend import http_util
 from tensorboard.backend.event_processing import event_multiplexer
 from tensorboard.plugins import base_plugin
 from tensorboard.backend.event_processing import io_wrapper
+
 
 class ParamPlotPlugin(base_plugin.TBPlugin):
     """A plugin that serves greetings recorded during model runs."""
@@ -48,28 +35,31 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
         self._parameter_config = {}
         self.parameters = []
-      
-    def _initialise_config(self):
-      # On the first request to getting the parameters, construct the config object
-      if not self._parameter_config:
-        # Read in all the config files in each run and create the combined config
-        for run_name in self._multiplexer.Runs().keys():
-          run_path = os.path.join(self._context.logdir, run_name, 'runparams.json')
-          with open(run_path, 'r') as config_file_handle:
-            self._parameter_config[run_name] = json.loads(config_file_handle.read())
-    
-        # backfill any parameters which are missing with default values
-        parameter_keys = list(map(lambda x: x.keys(), self._parameter_config.values()))
-        print(parameter_keys)
-        self.parameters = set(parameter_keys[0])
-        for parameter_list in parameter_keys[1:]:
-          self.parameters.update(parameter_list)
 
-        for run_name in self._parameter_config:
-          run_parameters = self._parameter_config[run_name]
-          for parameter in self.parameters:
-            if parameter not in run_parameters:
-              run_parameters[parameter] = 0 # We assume all parameter values are numerical so NaN is a suitable sentinel value
+    def _initialise_config(self):
+        # On the first request to getting the parameters, construct the config object
+        if not self._parameter_config:
+            # Read in all the config files in each run and create the combined config
+            for run_name in self._multiplexer.Runs().keys():
+                run_path = os.path.join(
+                    self._context.logdir, run_name, 'runparams.json')
+                with open(run_path, 'r') as config_file_handle:
+                    self._parameter_config[run_name] = json.loads(
+                        config_file_handle.read())
+
+            # backfill any parameters which are missing with default values
+            parameter_keys = list(
+                map(lambda x: x.keys(), self._parameter_config.values()))
+            self.parameters = set()
+            for parameter_list in parameter_keys:
+                self.parameters.update(parameter_list)
+
+            for run_name in self._parameter_config:
+                run_parameters = self._parameter_config[run_name]
+                for parameter in self.parameters:
+                    if parameter not in run_parameters:
+                        # We assume all parameter values are numerical so NaN is a suitable sentinel value
+                        run_parameters[parameter] = 0
 
     def _get_valid_runs(self):
         return [run for run in self._multiplexer.Runs() if run in self._parameter_config]
@@ -123,52 +113,50 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
           Whether this plugin is active.
         """
         if not self._multiplexer:
-          return False
+            return False
 
         # The plugin is active if there are any runs in the runparam dictionary which are in the logdir
         return bool(any(self._get_valid_runs()))
-    
+
     def _get_tensor_events_payload(self, parameter, tag):
-      processed_events = []
-      # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
-      for run in self._get_valid_runs():
-        tensor_events = self._multiplexer.Tensors(run, tag)
-        param_value = self._parameter_config[run][parameter]
-        processed_events = processed_events + [{"run": run, "payload": (ev.wall_time, param_value, tf.make_ndarray(ev.tensor_proto).item())} for ev in tensor_events] 
-      return processed_events
+        processed_events = []
+        # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
+        for run in self._get_valid_runs():
+            tensor_events = self._multiplexer.Tensors(run, tag)
+            param_value = self._parameter_config[run][parameter]
+            processed_events = processed_events + [{"run": run, "payload": (
+                ev.wall_time, param_value, tf.make_ndarray(ev.tensor_proto).item())} for ev in tensor_events]
+        return processed_events
 
     @wrappers.Request.application
     def _paramdatabytag_route(self, request):
-      """A route which returns the runparams for a particular run along with the tag specific data
+        """A route which returns the runparams for a particular run along with the tag specific data
 
-      Returns:
-        A JSON object of the form:
-        [(wall_time, parameter_value, tag)] for each run
-      """
+        Returns:
+          A JSON object of the form:
+          [(wall_time, parameter_value, tag)] for each run
+        """
 
-      parameter = request.args.get('parameter')
-      tag = request.args.get('tag')
+        parameter = request.args.get('parameter')
+        tag = request.args.get('tag')
 
-      response = self._get_tensor_events_payload(parameter, tag)
+        response = self._get_tensor_events_payload(parameter, tag)
 
-      return http_util.Respond(request, response, 'application/json')
+        return http_util.Respond(request, response, 'application/json')
 
     @wrappers.Request.application
     def _parameters_route(self, request):
-      """A route which returns the list of paramaters which each run is tagged with in the run parameters json file
+        """A route which returns the list of paramaters which each run is tagged with in the run parameters json file
 
-      Returns: A JSON object which is an array of parameter names (it is an assumption of the runparams schema all 
-      runs will be tagged with the same parameters)
-      """
+        Returns: A JSON object which is an array of parameter names (it is an assumption of the runparams schema all 
+        runs will be tagged with the same parameters)
+        """
 
-      self._initialise_config()
+        self._initialise_config()
 
-      response = {
-          "payload": list(self.parameters)
-      }
+        response = {
+            "payload": list(self.parameters)
+        }
 
-      print(response)
-      return http_util.Respond(request, response, 'application/json')
-
-    
-
+        print(response)
+        return http_util.Respond(request, response, 'application/json')

@@ -1,0 +1,73 @@
+<link rel="import" href="../paper-button/paper-button.html">
+<link rel="import" href="../paper-dialog/paper-dialog.html">
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../tf-backend/tf-backend.html">
+<link rel="import" href="../tf-color-scale/tf-color-scale.html">
+<link rel="import" href="../tf-dashboard-common/scrollbar-style.html">
+<link rel="import" href="../tf-dashboard-common/tf-multi-checkbox.html">
+<link rel="import" href="../tf-tensorboard/registry.html">
+<dom-module id="runsenabler-dashboard">
+    <template id="checkbox-container">
+        <tf-multi-checkbox
+            id="runsCheckbox"
+            names="[[runs]]"
+            selection-state="{{runSelectionState}}"
+            out-selected="{{selectedRuns}}"
+        >
+        </tf-multi-checkbox>
+    </template>
+    <style>
+        #checkbox-container {
+            margin: 50px;
+        }
+    </style>
+    <script>
+        Polymer({
+            is: 'runsenabler-dashboard',
+            properties: {
+                runs: Array,
+                    runSelectionState: {
+                    type: Object,
+                    observer: '_storeRunSelectionState',
+                    value: tf_storage.getObjectInitializer('runSelectionState', {defaultValue: {}}),
+                },
+                selectedRuns: {
+                    type: Array,
+                    notify: true,
+                },
+                _storeRunSelectionState: tf_storage.getObjectObserver('runSelectionState', {defaultValue: {}}),
+                _requestManager: {
+                    type: Object,
+                    value: () => new tf_backend.RequestManager(50),
+                },
+            },
+            ready() {
+                this.reload();
+            },
+            reload() {
+                this._fetchRuns();
+            },
+            _fetchRuns(){
+                const url = tf_backend.getRouter().pluginRoute('runsenabler', '/runs');
+                return this._requestManager.request(url).then(runState => {
+                    if (_.isEqual(runState, this.runSelectionState)) {
+                        // No need to update anything if there are no changes.
+                        return;
+                    }
+
+                    // Filter the selected runs to only be those contained in the new runState
+                    const newRuns = Object.keys(runState);
+                    const newSelectedRuns = this.selectedRuns.filter((run) => newRuns.includes(run));
+
+                    this.set('runSelectionState', runState);
+                    this.set('runs', Object.keys(runState));
+                    this.set('selectedRuns', newSelectedRuns);
+                });
+            }
+        });
+        tf_tensorboard.registerDashboard({
+            plugin: 'runsenabler',
+            elementName: 'runsenabler-dashboard'
+        });
+    </script>
+</dom-module>

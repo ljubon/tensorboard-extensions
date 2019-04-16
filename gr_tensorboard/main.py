@@ -18,16 +18,41 @@ from __future__ import print_function
 
 import os
 import sys
+import shutil
 
 from tensorboard import default
 from tensorboard import program
 import tensorflow as tf
 
 from paramplot import paramplot_plugin
+from runsenabler import runsenabler_loader
 
 if __name__ == '__main__':
-  plugins = default.get_plugins() + [paramplot_plugin.ParamPlotPlugin]
-  assets = os.path.join(tf.resource_loader.get_data_files_path(), 'assets.zip')
-  tensorboard = program.TensorBoard(plugins, lambda: open(assets, 'rb'))
-  tensorboard.configure(sys.argv)
-  sys.exit(tensorboard.main())
+    # Intialise the RunsEnabler loader with some default value since we will set the original logdir later
+    assets = os.path.join(
+        tf.resource_loader.get_data_files_path(), 'assets.zip')
+    runsenabler_loader = runsenabler_loader.RunsEnablerLoader('some_dir')
+    plugins = default.get_plugins(
+    ) + [paramplot_plugin.ParamPlotPlugin, runsenabler_loader]
+
+    tensorboard = program.TensorBoard(plugins, lambda: open(assets, 'rb'))
+    tensorboard.configure(sys.argv)
+
+    # Retrieve the actual log directory and replace it in the context with the new logdir
+    original_logdir = tensorboard.flags.logdir
+    parent_dir = os.path.abspath(os.path.join(original_logdir, os.pardir))
+    new_logdir = os.path.join(parent_dir, 'temp_logdir')
+
+    # Create the temp dir
+    os.makedirs(new_logdir)
+
+    # swap the original logdir for the new one
+    runsenabler_loader._actual_logdir = original_logdir
+    tensorboard.flags.logdir = new_logdir
+
+    # Run tensorboard with the modified logdir
+    try:
+        sys.exit(tensorboard.main())
+    finally:
+        # Delete the temp logdir containing symbolic links to the original logdir runs
+        shutil.rmtree(new_logdir)

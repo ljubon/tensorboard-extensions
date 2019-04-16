@@ -34,13 +34,6 @@ limitations under the License.
 <link rel="import" href="../tf-tensorboard/registry.html">
 <link rel="import" href="../tf-utils/tf-utils.html">
 <link rel="import" href="paramplot-card.html">
-
-<!--
-  A frontend that displays a set of tf-scalar-charts, each of which
-  represents the time series for a particular tag. This dashboard
-  provides a categorizer, run selector, and abcissa selector, by which
-  the user can customize how data is organized and displayed.
--->
 <dom-module id="paramplot-dashboard">
   <template>
     <tf-dashboard-layout>
@@ -54,41 +47,34 @@ limitations under the License.
               <li>TensorBoard can’t find your event files.
             </ul>
             <p>
-            If you’re new to using TensorBoard, and want to find out how
-            to add data and set up your event files, check out the
-            <a href="https://github.com/tensorflow/tensorboard/blob/master/README.md">README</a>
-            and perhaps the <a href="https://www.tensorflow.org/get_started/summaries_and_tensorboard">TensorBoard tutorial</a>.
-            <p>
-            If you think TensorBoard is configured properly, please see
-            <a href="https://github.com/tensorflow/tensorboard/blob/master/README.md#my-tensorboard-isnt-showing-any-data-whats-wrong">the section of the README devoted to missing data problems</a>
-            and consider filing an issue on GitHub.
+              If you’re new to using TensorBoard, and want to find out how
+              to add data and set up your event files, check out the
+              <a href="https://github.com/tensorflow/tensorboard/blob/master/README.md">README</a>
+              and perhaps the <a href="https://www.tensorflow.org/get_started/summaries_and_tensorboard">TensorBoard
+                tutorial</a>.
+              <p>
+                If you think TensorBoard is configured properly, please see
+                <a
+                  href="https://github.com/tensorflow/tensorboard/blob/master/README.md#my-tensorboard-isnt-showing-any-data-whats-wrong">the
+                  section of the README devoted to missing data problems</a>
+                and consider filing an issue on GitHub.
           </div>
         </template>
         <template is="dom-if" if="[[!_dataNotFound]]">
           <template is="dom-repeat" items="[[_categories]]" as="category">
-            <tf-category-pane
-              category="[[category]]"
-              opened="[[_getPaneOpened(category)]]"
-              on-opened-changed="_onPaneOpenChanged"
-            >
-              <tf-paginated-view
-                items="[[category.items]]"
-                pages="{{category._pages}}"
-              >
+            <tf-category-pane category="[[category]]" opened="[[_getPaneOpened(category)]]"
+              on-opened-changed="_onPaneOpenChanged">
+              <tf-paginated-view items="[[category.items]]" pages="{{category._pages}}">
                 <template is="dom-repeat" items="[[category._pages]]" as="page">
                   <template is="dom-if" if="[[page.active]]">
                     <div class="layout horizontal wrap">
                       <template is="dom-repeat" items="[[page.items]]" as="taggedSeries">
-                          <template is="dom-repeat" items="[[taggedSeries.series]]" as="series">
-                                <paramplot-card
-                                    active="[[page.active]]"
-                                    data-to-load="[[_getDataToLoadFromSeriesElement(series)]]"
-                                    request-manager="[[_requestManager]]"
-                                    tag="[[taggedSeries.tag]]"
-                                    parameter="[[series.parameter]]"
-                                    x-type="[[_xType]]"
-                                ></paramplot-card>
-                          </template>
+                        <template is="dom-repeat" items="[[taggedSeries.series]]" as="series">
+                          <paramplot-card active="[[page.active]]"
+                            data-to-load="[[_getDataToLoadFromSeriesElement(series)]]"
+                            request-manager="[[_requestManager]]" tag="[[taggedSeries.tag]]"
+                            parameter="[[series.parameter]]" x-type="[[_xType]]"></paramplot-card>
+                        </template>
                       </template>
                     </div>
                   </template>
@@ -106,6 +92,7 @@ limitations under the License.
         max-width: 540px;
         margin: 80px auto 0 auto;
       }
+
       .center {
         overflow-x: hidden;
       }
@@ -151,7 +138,7 @@ limitations under the License.
       observers: [
         '_updateCategories(_runToTag, _categoriesDomReady)',
       ],
-      _getDataToLoadFromSeriesElement(seriesElement){
+      _getDataToLoadFromSeriesElement(seriesElement) {
         return [seriesElement];
       },
       _getCategoryKey(category) {
@@ -206,16 +193,16 @@ limitations under the License.
         });
       },
       _updateCategories(runToTag, _categoriesDomReady) {
-        if(!_categoriesDomReady || !this._parameters){
+        if (!_categoriesDomReady || !this._parameters) {
           return;
         }
         const runsKeys = Object.keys(runToTag);
         let categories = tf_categorization_utils.categorizeTags(runToTag, runsKeys);
         categories.forEach(category => {
-            category.items = category.items.map(item => ({
-                tag: item.tag,
-                series: this._parameters.map(parameter => ({parameter, tag: item.tag})),
-            }));
+          category.items = category.items.map(item => ({
+            tag: item.tag,
+            series: this._parameters.map(parameter => ({ parameter, tag: item.tag })),
+          }));
         });
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
       },

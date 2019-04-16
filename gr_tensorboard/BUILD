@@ -12,6 +12,7 @@ py_binary(
     srcs_version = "PY2AND3",
     deps = [
         "//paramplot:paramplot_plugin",
+        "//runsenabler:runsenabler_loader",
         "@org_pocoo_werkzeug",
         "@org_tensorflow_tensorboard//tensorboard:default",
         "@org_tensorflow_tensorboard//tensorboard:program",
@@ -24,6 +25,7 @@ tf_web_library(
     path = "/",
     deps = [
         "//paramplot:paramplot_dashboard",
+        "//runsenabler:runsenabler_dashboard",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:webcomponentsjs",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard:default_plugins",

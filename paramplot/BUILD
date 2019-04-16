@@ -3,21 +3,10 @@ package(default_visibility = ["//visibility:public"])
 load("@org_tensorflow_tensorboard//tensorboard/defs:web.bzl", "tf_web_library")
 
 py_library(
-    name = "paramplot_loader",
-    srcs = ["paramplot_loader.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":paramplot_plugin",
-        "@org_tensorflow_tensorboard//tensorboard/plugins:base_plugin",
-    ],
-)
-
-py_library(
     name = "paramplot_plugin",
     srcs = ["paramplot_plugin.py"],
     srcs_version = "PY2AND3",
     deps = [
-        "@org_pocoo_werkzeug",
         "@org_pythonhosted_six",
         "@org_tensorflow_tensorboard//tensorboard/backend:http_util",
         "@org_tensorflow_tensorboard//tensorboard/backend/event_processing:event_accumulator",
@@ -29,7 +18,7 @@ py_binary(
     name = "paramplot_demo",
     srcs = ["paramplot_demo.py"],
     srcs_version = "PY2AND3",
-    deps = [":paramplot_summary"],
+    deps = [":paramplot_summary", "//lib:config_writer"],
 )
 
 py_library(

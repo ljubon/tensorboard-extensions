@@ -11,7 +11,7 @@ py_binary(
     main = "main.py",
     srcs_version = "PY2AND3",
     deps = [
-        "//paramplot:paramplot_loader",
+        "//paramplot:paramplot_plugin",
         "@org_pocoo_werkzeug",
         "@org_tensorflow_tensorboard//tensorboard:default",
         "@org_tensorflow_tensorboard//tensorboard:program",

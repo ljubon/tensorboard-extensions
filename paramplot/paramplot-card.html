@@ -84,14 +84,16 @@
           type: Object,
           value: function () {
             return (scalarChart, datum, data) => {
+              let counter = 0;
               const formattedData = data.map(data => {
                 const datum = data.payload;
                 return {
-                  wall_time: new Date(datum[1] * 1000),
+                  wall_time: new Date((++counter)*1000),
                   step: datum[1],
                   scalar: datum[2],
                 }
-              }).sort((a, b) => a.wall_time - b.wall_time);
+              }).sort(function(a,b){return a.step - b.step});
+              console.log(formattedData);
               const name = this._getSeriesNameFromDatum(datum);
               scalarChart.setSeriesMetadata(name, datum);
               scalarChart.setSeriesData(name, formattedData);

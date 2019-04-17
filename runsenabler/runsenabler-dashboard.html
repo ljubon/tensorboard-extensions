@@ -6,40 +6,286 @@
 <link rel="import" href="../tf-dashboard-common/scrollbar-style.html">
 <link rel="import" href="../tf-dashboard-common/tf-multi-checkbox.html">
 <link rel="import" href="../tf-tensorboard/registry.html">
+<link rel="import" href="../tf-dashboard-common/run-color-style.html">
 <dom-module id="runsenabler-dashboard">
-    <template id="checkbox-container">
-        <tf-multi-checkbox
-            id="runsCheckbox"
-            names="[[runs]]"
-            selection-state="{{runSelectionState}}"
-            out-selected="{{selectedRuns}}"
-        >
-        </tf-multi-checkbox>
-    </template>
+    <style include="scrollbar-style"></style>
+    <style include="run-color-style"></style>
+    <template>
+      <paper-input
+        id="runs-regex"
+        no-label-float
+        label="Write a regex to filter runs"
+        value="[[regex]]"
+        on-bind-value-changed="_debouncedRegexChange">
+    </paper-input>
+      <div id="outer-container" class="scrollbar">
+        <template
+          is="dom-repeat"
+          items="[[runsMatchingRegex]]" as="run">
+          <div class="run-row">
+            <div class="icon-container checkbox-container vertical-align-container">
+              <paper-checkbox
+                class="checkbox vertical-align-center"
+                id$="checkbox-[[run]]"
+                name="[[run]]"
+                checked="[[isChecked(run)]]"
+                on-change="_checkboxChange">
+            </paper-checkbox>
+            </div>
+            <div class="item-label-container">
+              <span>[[run]]</span>
+            </div>
+          </div>
+        </template>
+      </div>
     <style>
-        #checkbox-container {
-            margin: 50px;
-        }
+      paper-input {
+        --paper-input-container-focus-color: var(--tb-orange-strong);
+        --paper-input-container-input: {
+          font-size: 14px;
+        };
+        --paper-input-container-label: {
+          font-size: 14px;
+        };
+      }
+      :host {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      #outer-container {
+        overflow-y: auto;
+        overflow-x: hidden;
+        width: 100%;
+        height: 0; /* Quirk to make firefox add scrolling instead of expand div */
+        flex-grow: 1;
+        flex-shrink: 1;
+        word-wrap: break-word;
+      }
+      .run-row {
+        padding-top: 5px;
+        padding-bottom: 5px;
+        display: flex;
+        flex-direction: row;
+        font-size: 13px;
+        word-break: break-all; /* makes wrapping of hyperparam strings better */
+      }
+      .icon-container {
+        flex-grow: 0;
+        flex-shrink: 0;
+        padding-left: 2px;
+      }
+      .checkbox {
+        padding-left: 2px;
+        width: 18px;
+        height: 18px;
+      }
+      .isolator {
+        width: 18px;
+        height: 18px;
+        padding: 0px;
+      }
+      .isolator-container {
+        padding-left: 6px;
+        padding-right: 3px;
+      }
+      .checkbox-container {
+        padding-left: 2px;
+      }
+      .item-label-container {
+        padding-left: 5px;
+        flex-grow: 1;
+        flex-shrink: 1;
+        width: 0px; /* hack to get the flex-grow to work properly */
+      }
+      .tooltip-value-container {
+        display: flex;
+        justify-content: center;
+        flex-grow: 0;
+        flex-shrink: 0;
+        text-align:right;
+        padding-left: 2px;
+      }
+      .vertical-align-container {
+        display: flex;
+        justify-content: center;
+      }
+      .vertical-align-container .vertical-align-center {
+        align-self: center;
+      }
+      .vertical-align-container .vertical-align-top {
+        align-self: start;
+      }
     </style>
+    </template>
     <script>
         Polymer({
             is: 'runsenabler-dashboard',
             properties: {
                 runs: Array,
-                    runSelectionState: {
-                    type: Object,
-                    observer: '_storeRunSelectionState',
-                    value: tf_storage.getObjectInitializer('runSelectionState', {defaultValue: {}}),
-                },
                 selectedRuns: {
                     type: Array,
                     notify: true,
                 },
-                _storeRunSelectionState: tf_storage.getObjectObserver('runSelectionState', {defaultValue: {}}),
                 _requestManager: {
                     type: Object,
                     value: () => new tf_backend.RequestManager(50),
+                }, 
+                coloring: {
+                    type: Object,
+                    value: {
+                        getColor: () => '',
+                    },
                 },
+                regex: {
+                    type: String,
+                    notify: true,
+                    value: '',
+                },  // Regex for filtering the names
+                _regex: {type: Object, computed: '_makeRegex(regex)'},
+                runsMatchingRegex: {
+                    type: Array,
+                    computed: 'computeNamesMatchingRegex(runs, _regex)'
+                },  // Runs that match the regex
+                runSelectionState: {
+                    // if a name is explicitly enabled, True, if explicitly disabled, False.
+                    // if undefined, default value (enable for first k names, disable after).
+                    type: Object,
+                    notify: true,
+                    value: () => ({}),
+                },
+                isChecked: {
+                    type: Function,
+                    value: function() {
+                        return (run) => this.runSelectionState[run]
+                    },
+                },
+                _debouncedRegexChange: {
+                    type: Object,
+                    // Updating the regex can be slow, because it involves updating styles
+                    // on a large number of Polymer paper-checkboxes. We don't want to do
+                    // this while the user is typing, as it may make a bad, laggy UI.
+                    // So we debounce the updates that come from user typing.
+                    value: function() {
+                        var debounced = _.debounce(r => {
+                            this.regex = r;
+                        }, 150, {leading: false});
+                        return function() {
+                            var r = this.$$('#runs-regex').value;
+                            if (r == '') {
+                                // If the user cleared the field, they may be done typing, so
+                                // update more quickly.
+                                this.async(() => {
+                                    this.regex = r;
+                                }, 30);
+                            } else {
+                                debounced(r);
+                            };
+                        };
+                    },
+                },
+                outSelected: {
+                    type: Array,
+                    notify: true,
+                    computed: 'computeOutSelected(namesMatchingRegex.*, selectionState.*)'
+                },
+                maxNamesToEnableByDefault: {
+                    // When TB first loads, if it has k or fewer names, they are all enabled
+                    // by default. If there are more, then they are all disabled.
+                    type: Number,
+                    value: 40,
+                },
+            },
+            listeners: {
+                'dom-change': 'synchronizeColors',
+            },
+            _makeRegex: function(regexString) {
+                try {
+                    return new RegExp(regexString);
+                } catch (e) {
+                    return null;
+                }
+            },
+            computeNamesMatchingRegex: function(__, ___) {
+                const regex = this._regex;
+                return regex ? this.runs.filter(run => regex.test(run)) : this.runs;
+            },
+            computeOutSelected: function(__, ___) {
+                var runSelectionState = this.runSelectionState;
+                var num = this.maxRunsToEnableByDefault;
+                var allEnabled = this.runsMatchingRegex.length <= num;
+                return this.runsMatchingRegex.filter(run => {
+                    return runSelectionState[run] == null ? allEnabled : runSelectionState[run];
+                });
+            },
+            synchronizeColors: function(e) {
+                const checkboxes = this.querySelectorAll('paper-checkbox');
+                checkboxes.forEach(p => {
+                    const color = this.coloring.getColor(p.name);
+                    p.customStyle['--paper-checkbox-checked-color'] = color;
+                    p.customStyle['--paper-checkbox-checked-ink-color'] = color;
+                    p.customStyle['--paper-checkbox-unchecked-color'] = color;
+                    p.customStyle['--paper-checkbox-unchecked-ink-color'] = color;
+                });
+                const buttons = this.querySelectorAll('.isolator');
+                buttons.forEach(p => {
+                    const color = this.coloring.getColor(p.name);
+                    p.style['color'] = color;
+                });
+                // The updateStyles call fails silently if the browser doesn't have focus,
+                // e.g. if TensorBoard was opened into a new tab that isn't visible.
+                // So we wait for requestAnimationFrame.
+                window.requestAnimationFrame(() => {
+                    this.updateStyles();
+                });
+            },
+            _checkboxChange: function(e) {
+                var target = (Polymer.dom(e)).localTarget;
+                const newSelectionState = _.clone(this.runSelectionState);
+                const selectedRun = target.name;
+
+                // Determine whether the checkbox was enabled or disabled
+                const beforeState = newSelectionState[selectedRun];
+                const afterState = target.checked;
+
+                newSelectionState[selectedRun] = target.checked;
+                // n.b. notifyPath won't work because names may have periods.
+                this.runSelectionState = newSelectionState;
+
+                // Send a request to enable / disable the run in the runsenabler backend
+                if(beforeState && !afterState){
+                    // Disabled
+                    this._disableRun(selectedRun);
+                }
+                else if(!beforeState && afterState){
+                    // Enabled
+                    this._enableRun(selectedRun);
+                }
+            },
+            _isChecked: function(run, outSelectedChange){
+                return this.runSelectionState[run];
+            },
+            toggleAll: function() {
+                var anyToggledOn = this.runsMatchingRegexgetRouter
+                    .some((run) => this.runSelectionState[run]);
+
+                var selectionStateIsDefault =
+                    Object.keys(this.runSelectionState).length == 0;
+
+                var defaultOff = this.runsMatchingRegex.length > this.maxRunsToEnableByDefault;
+                // We have runs toggled either if some were explicitly toggled on, or if
+                // we are in the default state, and there are few enough that we default
+                // to toggling on.
+                anyToggledOn = anyToggledOn || selectionStateIsDefault && !defaultOff;
+
+                // If any are toggled on, we turn everything off. Or, if none are toggled
+                // on, we turn everything on.
+
+                var newRunsDisabled = {};
+                this.runs.forEach(function(run) {
+                    newRunsDisabled[run] = !anyToggledOn;
+                });
+                this.runSelectionState = newRunsDisabled;
             },
             ready() {
                 this.reload();
@@ -54,16 +300,27 @@
                         // No need to update anything if there are no changes.
                         return;
                     }
-
+        
                     // Filter the selected runs to only be those contained in the new runState
                     const newRuns = Object.keys(runState);
-                    const newSelectedRuns = this.selectedRuns.filter((run) => newRuns.includes(run));
-
+        
                     this.set('runSelectionState', runState);
-                    this.set('runs', Object.keys(runState));
-                    this.set('selectedRuns', newSelectedRuns);
+                    console.log(runState);
+                    this.set('runs', newRuns.sort());
                 });
-            }
+            },
+            _enableRun(run){
+                const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({
+                  run
+                }));
+                return this._requestManager.request(url)
+            },
+            _disableRun(run){
+                const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablerun', new URLSearchParams({
+                  run
+                }));
+                return this._requestManager.request(url)
+            },
         });
         tf_tensorboard.registerDashboard({
             plugin: 'runsenabler',

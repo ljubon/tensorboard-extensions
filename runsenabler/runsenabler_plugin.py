@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import shutil
 import json
 import tensorflow as tf
 from werkzeug import wrappers
@@ -36,8 +37,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self.temp_logdir = context.logdir
 
         # Get all the runs in the original logdirectory and set them to false by default
-        self._run_state = {
-            run: False for run in io_wrapper.GetLogdirSubdirectories(self.actual_logdir)}
+        self._run_state = {run: False for run in self._get_runs_from_actual_logdir()}
+    
+    def _get_runs_from_actual_logdir(self):
+        return [run.replace(self.actual_logdir+os.path.sep, "") for run in io_wrapper.GetLogdirSubdirectories(self.actual_logdir)]
+
 
     def get_plugin_apps(self):
         """Gets all routes offered by the plugin.
@@ -93,8 +97,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._multiplexer.Reload()
 
         # Add the run to the multiplexer (this will automatically reload the accumulators)
-        self._multiplexer.AddRun(run)
-        self._run_state[src_path] = True
+        self._multiplexer.AddRun(dest_path, run)
+        self._run_state[run] = True
 
         return http_util.Respond(request, self._run_state, 'application/json')
 
@@ -117,11 +121,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Delete symlink from run in LOGDIR to TEMPDIR
         src_path = os.path.join(self.actual_logdir, run)
         dest_path = os.path.join(self.temp_logdir, run)
-        os.rmdir(dest_path)
+        os.unlink(dest_path)
 
         # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator
         self._multiplexer.Reload()
-        self._run_state[src_path] = False
+        self._run_state[run] = False
 
         return http_util.Respond(request, self._run_state, 'application/json')
 
@@ -140,5 +144,5 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         self._run_state = {run: (self._run_state[run] if run in self._run_state else False)
-                           for run in io_wrapper.GetLogdirSubdirectories(self.actual_logdir)}
+                           for run in self._get_runs_from_actual_logdir()}
         return http_util.Respond(request, self._run_state, 'application/json')

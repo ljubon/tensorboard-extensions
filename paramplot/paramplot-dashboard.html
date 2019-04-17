@@ -192,10 +192,18 @@ limitations under the License.
           chart.reload();
         });
       },
-      _updateCategories(runToTag, _categoriesDomReady) {
-        if (!_categoriesDomReady || !this._parameters) {
-          return;
+      _updateCategories(runToTag, categoriesDomReady) {
+        const whileCondition = !categoriesDomReady || !this._parameters;
+        this._pollCategoryCreation(runToTag, whileCondition);
+      },
+      _pollCategoryCreation(runToTag, whileCondition){
+        while(whileCondition){
+          setTimeout(500);
         }
+        this._createAndUpdateCategories(runToTag);
+      },
+      _createAndUpdateCategories(runToTag){
+        console.log('Now rendering the categories');
         const runsKeys = Object.keys(runToTag);
         let categories = tf_categorization_utils.categorizeTags(runToTag, runsKeys);
         categories.forEach(category => {
@@ -205,7 +213,7 @@ limitations under the License.
           }));
         });
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
-      },
+      }
     });
     tf_tensorboard.registerDashboard({
       plugin: 'paramplot',

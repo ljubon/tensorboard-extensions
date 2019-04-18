@@ -50,7 +50,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     
     def _get_runs_from_actual_logdir(self):
         dir_list = sorted(list(io_wrapper.GetLogdirSubdirectories(self.actual_logdir)), key=os.path.getmtime)
-        print(dir_list)
         return [run.replace(self.actual_logdir+os.path.sep, "") for run in dir_list]
 
 

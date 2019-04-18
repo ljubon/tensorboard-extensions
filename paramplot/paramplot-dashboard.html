@@ -193,13 +193,10 @@ limitations under the License.
         });
       },
       _updateCategories(runToTag, categoriesDomReady) {
-        const whileCondition = !categoriesDomReady || !this._parameters;
-        this._pollCategoryCreation(runToTag, whileCondition);
-      },
-      _pollCategoryCreation(runToTag, whileCondition){
-        while(whileCondition){
-          setTimeout(500);
-        }
+        if(!this._parameters){
+          return;
+        }      
+
         this._createAndUpdateCategories(runToTag);
       },
       _createAndUpdateCategories(runToTag){

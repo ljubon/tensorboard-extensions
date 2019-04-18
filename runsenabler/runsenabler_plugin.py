@@ -21,6 +21,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     # offered by this plugin. This property must uniquely identify this plugin
     # from all other plugins.
     plugin_name = 'runsenabler'
+    MIN_DEFAULT = 10
 
     def __init__(self, context: base_plugin.TBContext, actual_logir: str):
         """Instantiates a RunsEnablerPlugin.
@@ -37,10 +38,20 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self.temp_logdir = context.logdir
 
         # Get all the runs in the original logdirectory and set them to false by default
-        self._run_state = {run: False for run in self._get_runs_from_actual_logdir()}
+        sortedRuns = self._get_runs_from_actual_logdir()
+        self._run_state = {run: False for run in sortedRuns}
+
+        # move the most recent files to the temp dir via a symlink - ensures that at least one run (likely the most relevant run) will be enabled
+        num_files = min(RunsEnablerPlugin.MIN_DEFAULT, len(sortedRuns))
+        for run in sortedRuns[-num_files:]:
+            run_name = run.replace(self.actual_logdir+os.path.sep, "")
+            runpath = self._create_symlink_for_run(run_name)
+            self._enable_run(runpath, run_name)
     
     def _get_runs_from_actual_logdir(self):
-        return [run.replace(self.actual_logdir+os.path.sep, "") for run in io_wrapper.GetLogdirSubdirectories(self.actual_logdir)]
+        dir_list = sorted(list(io_wrapper.GetLogdirSubdirectories(self.actual_logdir)), key=os.path.getmtime)
+        print(dir_list)
+        return [run.replace(self.actual_logdir+os.path.sep, "") for run in dir_list]
 
 
     def get_plugin_apps(self):
@@ -63,7 +74,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def is_active(self):
         """Determines whether this plugin is active.
 
-        This plugin is only active if there are runs in the runparams file which intersect with the available runs being monitored in the logdir
+        This plugin is only active if there are runs in the runparams config dictionary which intersect the available runs being monitored in the logdir
 
         Returns:
         Whether this plugin is active.
@@ -71,6 +82,21 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
         # The plugin is always active (will have to handle the case where )
         return True
+    
+    def _create_symlink_for_run(self, run):
+        # Create symlink from run in LOGDIR to TEMPDIR
+        src_path = os.path.join(self.actual_logdir, run)
+        dest_path = os.path.join(self.temp_logdir, run)
+        os.symlink(src_path, dest_path)
+        return dest_path
+
+    def _enable_run(self, runpath, run):
+        # Call reload on the multiplexer (required so that the newly added run will be loaded as well)
+        self._multiplexer.Reload()
+
+        # Add the run to the multiplexer (this will automatically reload the accumulators)
+        self._multiplexer.AddRun(runpath, run)
+        self._run_state[run] = True
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -88,19 +114,21 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
         run = request.args.get('run')
 
-        # Create symlink from run in LOGDIR to TEMPDIR
-        src_path = os.path.join(self.actual_logdir, run)
-        dest_path = os.path.join(self.temp_logdir, run)
-        os.symlink(src_path, dest_path)
-
-        # Call reload on the multiplexer (required so that the newly added run will be loaded as well)
-        self._multiplexer.Reload()
-
-        # Add the run to the multiplexer (this will automatically reload the accumulators)
-        self._multiplexer.AddRun(dest_path, run)
-        self._run_state[run] = True
+        runpath = self._create_symlink_for_run(run)
+        self._enable_run(runpath, run)
 
         return http_util.Respond(request, self._run_state, 'application/json')
+
+    def _delete_symlink_for_run(self, run):
+        # Delete symlink from run in LOGDIR to TEMPDIR
+        src_path = os.path.join(self.actual_logdir, run)
+        dest_path = os.path.join(self.temp_logdir, run)
+        os.unlink(dest_path)
+    
+    def _disable_run(self, run):
+        # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator
+        self._multiplexer.Reload()
+        self._run_state[run] = False
 
     @wrappers.Request.application
     def disablerun_route(self, request):
@@ -117,15 +145,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-
-        # Delete symlink from run in LOGDIR to TEMPDIR
-        src_path = os.path.join(self.actual_logdir, run)
-        dest_path = os.path.join(self.temp_logdir, run)
-        os.unlink(dest_path)
-
-        # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator
-        self._multiplexer.Reload()
-        self._run_state[run] = False
+        self._delete_symlink_for_run(run)
+        self._disable_run(run)
 
         return http_util.Respond(request, self._run_state, 'application/json')
 

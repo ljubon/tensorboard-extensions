@@ -1,17 +1,3 @@
-<!--
-@license
-Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
-
 <link rel="import" href="../paper-button/paper-button.html">
 <link rel="import" href="../paper-checkbox/paper-checkbox.html">
 <link rel="import" href="../paper-dropdown-menu/paper-dropdown-menu.html">
@@ -62,6 +48,7 @@ limitations under the License.
             <ul>
               <li>You haven’t written any scalar data to your event files.
               <li>TensorBoard can’t find your event files.
+              <li>I have introduced a bug somewhere....</li>
             </ul>
             <p>
               If you’re new to using TensorBoard, and want to find out how
@@ -78,21 +65,32 @@ limitations under the License.
           </div>
         </template>
         <template is="dom-if" if="[[!_dataNotFound]]">
-          <template is="dom-repeat" items="[[_categories]]" as="category">
-            <tf-category-pane category="[[category]]" opened="[[_getPaneOpened(category)]]"
-              on-opened-changed="_onPaneOpenChanged">
-              <tf-paginated-view items="[[category.items]]" pages="{{category._pages}}">
-                <template is="dom-repeat" items="[[category._pages]]" as="page">
+          <template is="dom-repeat" items="[[_tagParameterFilters]]" as="filter">
+            <paper-input
+              id$="tag-regex-[[index]]"
+              no-label-float
+              label="Write a regex to filter tags (y axis values)"
+              value="{{filter.tag}}"
+              on-bind-value-changed="_debouncedTagRegexChange">
+            </paper-input>
+            <paper-input
+              id$="parameter-regex-[[index]]"
+              no-label-float
+              label="Write a regex to filter parameters (x axis values)"
+              value="{{filter.parameter}}"
+              on-bind-value-changed="_debouncedParameterRegexChange">
+            </paper-input>
+            <tf-category-pane category="{{_categoryByIndex(index)}}" opened="{{_getPaneOpened(_categoryByIndex(index))}}" on-opened-changed="_onPaneOpenChanged">
+              <tf-paginated-view items="{{_categoryByIndex(index).items}}" pages="{{_categoryByIndex(index)._pages}}">
+                <template is="dom-repeat" items="{{_categoryByIndex(index)._pages}}" as="page">
                   <template is="dom-if" if="[[page.active]]">
                     <div class="layout horizontal wrap">
-                      <template is="dom-repeat" items="[[page.items]]" as="taggedSeries">
-                        <template is="dom-repeat" items="[[taggedSeries.series]]" as="series">
+                      <template is="dom-repeat" items="[[page.items]]">
                           <paramplot-card active="[[page.active]]"
-                            data-to-load="[[_getDataToLoadFromSeriesElement(series)]]"
-                            request-manager="[[_requestManager]]" tag="[[taggedSeries.tag]]"
-                            parameter="[[series.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(taggedSeries.tag)]]"></paramplot-card>
+                            data-to-load="[[_getDataToLoadFromSeriesElement(item)]]"
+                            request-manager="[[_requestManager]]" tag="[[item.tag]]"
+                            parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]"></paramplot-card>
                         </template>
-                      </template>
                     </div>
                   </template>
                 </template>
@@ -133,9 +131,9 @@ limitations under the License.
         _tags: Array,
         _parameters: Array,
         _dataNotFound: Boolean,
-        _tagFilter: {
-          type: String,
-          value: ''
+        _tagParameterFilters: {
+          type: Array,
+          value: () => [{tag: '', parameter: ''}]
         },
         // Categories must only be computed after _dataNotFound is found to be
         // true and then polymer DOM templating responds to that finding. We
@@ -145,17 +143,71 @@ limitations under the License.
           type: Array,
           value: () => [],
         },
+        _categoryByIndex: {
+          type: Function,
+          value: function(){
+            return index => this._categories[index] 
+          }
+        },
         _requestManager: {
           type: Object,
           value: () => new tf_backend.RequestManager(50),
         },
+        _debouncedTagRegexChange: {
+          type: Function,
+          value: function(){
+            return (event) => {
+              const regexValue = event.detail.value;
+              const id = event.target.dataHost.id;
+              const index = parseInt(id.split('-')[2]);
+              return this._debouncedRegexChangeByType('tag', index, regexValue);
+            } 
+          }
+        },
+        _debouncedParameterRegexChange: {
+          type: Function,
+          value: function(){
+            return (event) => {
+              const regexValue = event.detail.value;
+              const id = event.target.dataHost.id;
+              const index = parseInt(id.split('-')[2]);
+              return this._debouncedRegexChangeByType('parameter', index, regexValue);
+            } 
+          }
+        },
+        _debouncedRegexChangeByType: {
+          type: Function,
+          value: function(){
+            return (type, index, value) => {
+              const regexUpdate = (type == 'tag') ? ((val) => this._tagParameterFilters[index].tag = val) : ((val) => this._tagParameterFilters[index].parameter = val)  
+              const debounced = _.debounce(r => {
+                      regexUpdate(r);
+                      console.log(r);
+                  }, 150, {leading: false});
+              return function() {
+                console.log(value);
+                console.log(type);
+                if (value == '') {
+                    // If the user cleared the field, they may be done typing, so
+                    // update more quickly.
+                    this.async(() => {
+                        regexUpdate(value);
+                        console.log(value);
+                    }, 30);
+                } else {
+                    debounced(value);
+                };
+              };
+            }
+          } 
+        }
       },
       behaviors: [
         tf_dashboard_common.ArrayUpdateHelper,
       ],
-      observers: [
-        '_updateCategories(_runToTag, _categoriesDomReady)',
-      ],
+      // observers: [
+      //   '_updateCategories(_runToTag, _categoriesDomReady)',
+      // ],
       _getDataToLoadFromSeriesElement(seriesElement) {
         return [seriesElement];
       },
@@ -175,9 +227,13 @@ limitations under the License.
         this.reload();
       },
       reload() {
-        this._fetchParameters().then(this._fetchTags().then(() => {
-          this._reloadCharts();
-        }));
+        this._fetchParameters()
+          .then(() => this._fetchTags()
+            .then(() => {
+              this._updateCategories();
+              this._reloadCharts();
+            }));
+        console.log(this._tagParameterFilters);
       },
       _fetchTags() {
         const url = tf_backend.getRouter().pluginRoute('paramplot', '/tags');
@@ -211,23 +267,41 @@ limitations under the License.
           chart.reload();
         });
       },
-      _updateCategories(runToTag, categoriesDomReady) {
-        if(!this._parameters){
+      _updateCategories() {
+        if(!this._parameters || !this._tags){
           return;
         }      
 
-        this._createAndUpdateCategories(runToTag);
+        console.log('both parameters and tags have been loaded, now create the categories')
+
+        this._createAndUpdateCategories();
       },
-      _createAndUpdateCategories(runToTag){
+      _createAndUpdateCategories(){
         console.log('Now rendering the categories');
-        const runsKeys = Object.keys(runToTag);
-        let categories = tf_categorization_utils.categorizeTags(runToTag, runsKeys);
-        categories.forEach(category => {
-          category.items = category.items.map(item => ({
-            tag: item.tag,
-            series: this._parameters.map(parameter => ({ parameter, tag: item.tag})),
-          }));
+
+        // There should be an identical number of tagFilters and parameterFilters
+        categories = this._tagParameterFilters.map((tagFilter, index, arr) => {
+          // Obtain filtered categories for both kinds of filters
+          let categoryByTag = tf_categorization_utils.categorizeBySearchQuery(this._tags, tagFilter.tag);
+          let categoryByParameter = tf_categorization_utils.categorizeBySearchQuery(this._parameters, tagFilter.parameter);
+          
+          let categoryItems = categoryByTag.items.map(tag => categoryByParameter.items.map(parameter => ({tag, parameter})));
+          categoryItems = categoryItems.reduce((a,b) => a.concat(b), [])
+
+          // Merge the two categories into a single category
+          return {
+            name: `${categoryByTag.name} ${categoryByParameter.name}`,
+            metadata: {
+              type: categoryByTag.metadata.type,
+              validRegex: categoryByTag.metadata.validRegex && categoryByParameter.metadata.validRegex,
+              universalRegex: categoryByTag.metadata.universalRegex || categoryByParameter.metadata.universalRegex
+            },
+            items: categoryItems
+          }
         });
+        console.log('_createAndUpdateCategories');
+        console.log(categories);
+
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
       },
       _tagAggregationMethod(tag){

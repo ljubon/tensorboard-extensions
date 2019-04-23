@@ -28,7 +28,7 @@ from paramplot import paramplot_plugin
 from runsenabler import runsenabler_loader
 
 if __name__ == '__main__':
-    # Intialise the RunsEnabler loader with some default value since we will set the original logdir later
+    # Intialise the RunsEnabler loader with some default value. The original logdir will be set after arguments have been configured
     assets = os.path.join(
         tf.resource_loader.get_data_files_path(), 'assets.zip')
     runsenabler_loader = runsenabler_loader.RunsEnablerLoader('some_dir')

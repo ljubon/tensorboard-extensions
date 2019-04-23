@@ -120,7 +120,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     def _delete_symlink_for_run(self, run):
         # Delete symlink from run in LOGDIR to TEMPDIR
-        src_path = os.path.join(self.actual_logdir, run)
         dest_path = os.path.join(self.temp_logdir, run)
         os.unlink(dest_path)
     

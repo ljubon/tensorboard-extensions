@@ -49,9 +49,10 @@ def run(logdir, run_name, tag_value_map, parameter_map):
     # Write the value under the final_loss summary for that particular run
     with tf.Session() as session:
         for tag_name in tag_value_map:
-            summary = session.run(summary_ops[tag_name], feed_dict={
-                                  placeholders[tag_name]: tag_value_map[tag_name]})
-            writer.add_summary(summary)
+            for tagvalue in tag_value_map[tag_name]:
+                summary = session.run(summary_ops[tag_name], feed_dict={
+                                    placeholders[tag_name]: tagvalue})
+                writer.add_summary(summary)
 
     config_writer.Save()
     writer.close()
@@ -68,52 +69,23 @@ def run_all(logdir, run_names, tag_value_maps, parameter_maps, unused_verbose=Fa
 def main(unused_argv):
     print('Saving output to %s.' % LOGDIR)
 
-    runs = ["run1", "run2", "run3", "run4", "run5"]
-    tag_value_maps = {
-        "run1": {
-            "final_loss": random.uniform(0, 12),
-            "correlation_validation_train": random.random()
-        },
-        "run2": {
-            "final_loss": random.uniform(0, 12),
-            "correlation_validation_train": random.random()
-        },
-        "run3": {
-            "final_loss": random.uniform(0, 12),
-            "correlation_validation_train": random.random()
-        },
-        "run4": {
-            "final_loss": random.uniform(0, 12),
-            "correlation_validation_train": random.random()
-        },
-        "run5": {
-            "final_loss": random.uniform(0, 12),
-            "correlation_validation_train": random.random()
-        },
-    }
+    runs = ["run1", "run2", "run3", "run4", "run5", "run6", "blah", "run121", "runfhj", "daosidm", "runsomethingidontremember", "mfw"]
 
-    parameter_maps = {
-        "run1": {
-            "num_layers": 2,
-            "mystery_parameter": 1.1
-        },
-        "run2": {
-            "num_layers": 4,
-            "mystery_parameter": 2.3
-        },
-        "run3": {
-            "num_layers": 8,
-            "mystery_parameter": 5.4
-        },
-        "run4": {
-            "num_layers": 16,
-            "mystery_parameter": 10.74
-        },
-        "run5": {
-            "num_layers": 32,
-            "mystery_parameter": 8.29
+    def create_random_metrics():
+        return {
+            "single-metric": [random.uniform(0, 12)],
+            "epoch-varying-metric": [random.uniform(0,12) for _ in range(random.randint(1,20))]
         }
-    }
+    
+    def create_random_parameters():
+        return {
+            "integer-parameter": random.randint(1,128),
+            "float-parameter": random.uniform(0, 600),
+        }
+
+    tag_value_maps = {run: create_random_metrics() for run in runs}
+
+    parameter_maps = {run: create_random_parameters() for run in runs}
 
     run_all(LOGDIR, runs, tag_value_maps, parameter_maps, unused_verbose=True)
     print('Done. Output saved to %s.' % LOGDIR)

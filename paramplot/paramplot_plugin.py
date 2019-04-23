@@ -5,6 +5,7 @@ from __future__ import print_function
 import json
 import os
 import tensorflow as tf
+import numpy as np
 from werkzeug import wrappers
 
 from tensorboard.backend import http_util
@@ -20,6 +21,10 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
     # offered by this plugin. This property must uniquely identify this plugin
     # from all other plugins.
     plugin_name = 'paramplot'
+    MOST_RECENT = 'Most-Recent'
+    MIN = 'Min'
+    MAX = 'Max'
+    AVERAGE = 'Average'
 
     def __init__(self, context: base_plugin.TBContext):
         """Instantiates a ParamPlotPlugin.
@@ -116,15 +121,29 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         # The plugin is active if there are any runs in the runparam dictionary which are in the logdir
         return bool(any(self._get_valid_runs()))
 
-    def _get_tensor_events_payload(self, parameter, tag):
+    def aggregate_tensor_events(self, tensor_events, aggregation):
+        event_list = [tf.make_ndarray(event.tensor_proto).item() for event in tensor_events]
+        events_ndarray = np.array(event_list)
+        if aggregation == ParamPlotPlugin.MIN:
+            return np.amin(events_ndarray)
+        elif aggregation == ParamPlotPlugin.MAX:
+            return np.amax(events_ndarray)
+        elif aggregation == ParamPlotPlugin.AVERAGE:
+            return np.mean(events_ndarray)
+        else:
+            # Default to the most recent value semantics
+            event_result = max(tensor_events, key=(lambda ev: ev.wall_time))
+            return tf.make_ndarray(event_result.tensor_proto).item()
+
+    def _get_tensor_events_payload(self, parameter, tag, aggregation):
         processed_events = []
         print(self._get_valid_runs())
+
         # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run][parameter]
-            processed_events = processed_events + [{"run": run, "payload": (
-                ev.wall_time, param_value, tf.make_ndarray(ev.tensor_proto).item())} for ev in tensor_events]
+            processed_events = processed_events + [{"run": run, "payload": (param_value, self.aggregate_tensor_events(tensor_events, aggregation))}] 
         return processed_events
 
     @wrappers.Request.application
@@ -138,11 +157,12 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
         parameter = request.args.get('parameter')
         tag = request.args.get('tag')
+        aggregation = request.args.get('aggregation')
 
         self._multiplexer.Reload()
         self._compute_config()
 
-        response = self._get_tensor_events_payload(parameter, tag)
+        response = self._get_tensor_events_payload(parameter, tag, aggregation)
         print(response)
         return http_util.Respond(request, response, 'application/json')
 

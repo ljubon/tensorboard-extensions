@@ -37,6 +37,23 @@ limitations under the License.
 <dom-module id="paramplot-dashboard">
   <template>
     <tf-dashboard-layout>
+      <div class="sidebar">
+        <div class="sidebar-section">
+          <template is="dom-repeat" items="[[_tags]]" as="tag">
+              <div id="tooltip-sorting">
+                  <div>[[tag]]</div>
+                    <paper-dropdown-menu no-label-float id="dropdown-[[tag]]">
+                      <paper-menu class="dropdown-content" selected="0" slot="dropdown-content">
+                        <paper-item>Most-Recent</paper-item>
+                        <paper-item>Min</paper-item>
+                        <paper-item>Max</paper-item>
+                        <paper-item>Average</paper-item>
+                      </paper-menu>
+                    </paper-dropdown-menu>
+                </div>
+          </template>
+        </div>
+      </div>
       <div class="center">
         <template is="dom-if" if="[[_dataNotFound]]">
           <div class="no-data-warning">
@@ -73,7 +90,7 @@ limitations under the License.
                           <paramplot-card active="[[page.active]]"
                             data-to-load="[[_getDataToLoadFromSeriesElement(series)]]"
                             request-manager="[[_requestManager]]" tag="[[taggedSeries.tag]]"
-                            parameter="[[series.parameter]]" x-type="[[_xType]]"></paramplot-card>
+                            parameter="[[series.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(taggedSeries.tag)]]"></paramplot-card>
                         </template>
                       </template>
                     </div>
@@ -113,6 +130,7 @@ limitations under the License.
           value: vz_chart_helpers.XType.STEP,
         },
         _runToTag: Object,
+        _tags: Array,
         _parameters: Array,
         _dataNotFound: Boolean,
         _tagFilter: {
@@ -170,6 +188,7 @@ limitations under the License.
           }
           const tags = tf_backend.getTags(runToTag);
           this.set('_dataNotFound', tags.length === 0);
+          this.set('_tags', tags);
           this.set('_runToTag', runToTag);
           this.async(() => {
             // See the comment above `_categoriesDomReady`.
@@ -206,10 +225,16 @@ limitations under the License.
         categories.forEach(category => {
           category.items = category.items.map(item => ({
             tag: item.tag,
-            series: this._parameters.map(parameter => ({ parameter, tag: item.tag })),
+            series: this._parameters.map(parameter => ({ parameter, tag: item.tag})),
           }));
         });
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
+      },
+      _tagAggregationMethod(tag){
+        var selector = document.getElementById(`dropdown-${tag}`);
+        return () => {
+          return selector.selectedItemLabel;
+        };
       }
     });
     tf_tensorboard.registerDashboard({

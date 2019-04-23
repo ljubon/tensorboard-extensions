@@ -59,6 +59,14 @@
       properties: {
         tag: String,
         parameter: String,
+        aggregationMethod: {
+          type: Function,
+          value: () => 'Most-Recent'
+        },
+        title: {
+          type: String,
+          value: '',
+        },
         /**
          * @type {Array<Object>}
          */
@@ -89,11 +97,10 @@
                 const datum = data.payload;
                 return {
                   wall_time: new Date((++counter)*1000),
-                  step: datum[1],
-                  scalar: datum[2],
+                  step: datum[0],
+                  scalar: datum[1],
                 }
               }).sort(function(a,b){return a.step - b.step});
-              console.log(formattedData);
               const name = this._getSeriesNameFromDatum(datum);
               scalarChart.setSeriesMetadata(name, datum);
               scalarChart.setSeriesData(name, formattedData);
@@ -110,7 +117,8 @@
                 '/paramdatabytag',
                 new URLSearchParams({
                   tag,
-                  parameter
+                  parameter, 
+                  aggregation: this.aggregationMethod()
                 }));
             }
           },

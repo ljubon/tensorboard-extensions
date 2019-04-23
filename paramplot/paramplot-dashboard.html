@@ -225,15 +225,16 @@ limitations under the License.
         categories.forEach(category => {
           category.items = category.items.map(item => ({
             tag: item.tag,
-            series: this._parameters.map(parameter => ({ parameter, tag: item.tag, aggregation: this._tagAggregationMethod(item.tag)})),
+            series: this._parameters.map(parameter => ({ parameter, tag: item.tag})),
           }));
         });
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
       },
       _tagAggregationMethod(tag){
         var selector = document.getElementById(`dropdown-${tag}`);
-        console.log(selector);
-        return selector.selectedItemLabel;
+        return () => {
+          return selector.selectedItemLabel;
+        };
       }
     });
     tf_tensorboard.registerDashboard({

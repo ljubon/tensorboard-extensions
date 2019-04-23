@@ -13,7 +13,7 @@
 
 <dom-module id="paramplot-card">
   <template>
-    <tf-card-heading>[[_getSeriesDisplayNameFromDatum(tag, parameter, aggregationMethod)]]</tf-card-heading>
+    <tf-card-heading>[[_getSeriesDisplayNameFromDatum(tag, parameter)]]</tf-card-heading>
     <div id="tf-line-chart-data-loader-container">
       <tf-line-chart-data-loader active="[[active]]" data-series="[[_getDataSeries(dataToLoad)]]"
         data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-name="[[_getDataLoadName]]"
@@ -60,8 +60,12 @@
         tag: String,
         parameter: String,
         aggregationMethod: {
+          type: Function,
+          value: () => 'Most-Recent'
+        },
+        title: {
           type: String,
-          value: 'Most-Recent'
+          value: '',
         },
         /**
          * @type {Array<Object>}
@@ -97,7 +101,6 @@
                   scalar: datum[1],
                 }
               }).sort(function(a,b){return a.step - b.step});
-              console.log(formattedData);
               const name = this._getSeriesNameFromDatum(datum);
               scalarChart.setSeriesMetadata(name, datum);
               scalarChart.setSeriesData(name, formattedData);
@@ -108,14 +111,14 @@
         getDataLoadUrl: {
           type: Function,
           value: function () {
-            return ({ tag, parameter, aggregation }) => {
+            return ({ tag, parameter }) => {
               return tf_backend.getRouter().pluginRoute(
                 'paramplot',
                 '/paramdatabytag',
                 new URLSearchParams({
                   tag,
                   parameter, 
-                  aggregation
+                  aggregation: this.aggregationMethod()
                 }));
             }
           },
@@ -157,8 +160,8 @@
         return JSON.stringify([tag, parameter]);
       },
       // title is a visible string of a series for the UI.
-      _getSeriesDisplayNameFromDatum(tag, parameter, aggMethod) {
-        return `${aggMethod}(${tag.toUpperCase()}) against ${parameter.toUpperCase()}`;
+      _getSeriesDisplayNameFromDatum(tag, parameter) {
+        return `${tag.toUpperCase()} against ${parameter.toUpperCase()}`;
       },
     });
   </script>

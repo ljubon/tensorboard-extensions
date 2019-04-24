@@ -25,19 +25,21 @@
     <tf-dashboard-layout>
       <div class="sidebar">
         <div class="sidebar-section">
-          <template is="dom-repeat" items="[[_tags]]" as="tag">
-              <div id="tooltip-sorting">
-                  <div>[[tag]]</div>
-                    <paper-dropdown-menu no-label-float id="dropdown-[[tag]]">
-                      <paper-menu class="dropdown-content" selected="0" slot="dropdown-content">
-                        <paper-item>Most-Recent</paper-item>
-                        <paper-item>Min</paper-item>
-                        <paper-item>Max</paper-item>
-                        <paper-item>Average</paper-item>
-                      </paper-menu>
-                    </paper-dropdown-menu>
-                </div>
-          </template>
+          <div class="vertical">
+              <template is="dom-repeat" items="[[_tags]]" as="tag">
+                  <div id="tooltip-sorting" class="tag-aggregation">
+                      <div>[[tag]]</div>
+                        <paper-dropdown-menu no-label-float id="dropdown-[[tag]]">
+                          <paper-menu class="dropdown-content" selected="0" slot="dropdown-content" on-iron-activate="_aggregationMethodChange">
+                            <paper-item>Most-Recent</paper-item>
+                            <paper-item>Min</paper-item>
+                            <paper-item>Max</paper-item>
+                            <paper-item>Average</paper-item>
+                          </paper-menu>
+                        </paper-dropdown-menu>
+                    </div>
+              </template>
+          </div>
         </div>
       </div>
       <div class="center">
@@ -65,38 +67,48 @@
           </div>
         </template>
         <template is="dom-if" if="[[!_dataNotFound]]">
-          <template is="dom-repeat" items="[[_tagParameterFilters]]" as="filter">
-            <paper-input
-              id$="tag-regex-[[index]]"
-              no-label-float
-              label="Write a regex to filter tags (y axis values)"
-              value="{{filter.tag}}"
-              on-bind-value-changed="_debouncedTagRegexChange">
-            </paper-input>
-            <paper-input
-              id$="parameter-regex-[[index]]"
-              no-label-float
-              label="Write a regex to filter parameters (x axis values)"
-              value="{{filter.parameter}}"
-              on-bind-value-changed="_debouncedParameterRegexChange">
-            </paper-input>
-            <tf-category-pane category="{{_categoryByIndex(index)}}" opened="{{_getPaneOpened(_categoryByIndex(index))}}" on-opened-changed="_onPaneOpenChanged">
-              <tf-paginated-view items="{{_categoryByIndex(index).items}}" pages="{{_categoryByIndex(index)._pages}}">
-                <template is="dom-repeat" items="{{_categoryByIndex(index)._pages}}" as="page">
-                  <template is="dom-if" if="[[page.active]]">
-                    <div class="layout horizontal wrap">
-                      <template is="dom-repeat" items="[[page.items]]">
-                          <paramplot-card active="[[page.active]]"
-                            data-to-load="[[_getDataToLoadFromSeriesElement(item)]]"
-                            request-manager="[[_requestManager]]" tag="[[item.tag]]"
-                            parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]"></paramplot-card>
-                        </template>
-                    </div>
+          <template is="dom-repeat" items="[[_categories]]" as="categoryObject">
+            <div class="category-header">
+                <div class="tag-regex">
+                  <paper-input
+                    id$="tag-regex-[[index]]"
+                    no-label-float
+                    label="Write a regex to filter tags (y axis label)"
+                    value="{{categoryObject.tagFilter}}"
+                    on-bind-value-changed="_debouncedTagRegexChange">
+                  </paper-input>
+                </div>
+                <div class="parameter-regex">
+                  <paper-input
+                    id$="parameter-regex-[[index]]"
+                    no-label-float
+                    label="Write a regex to filter parameters (x axis label)"
+                    value="{{categoryObject.parameterFilter}}"
+                    on-bind-value-changed="_debouncedParameterRegexChange">
+                  </paper-input>
+                </div>
+                <div class="delete-category-button">
+                  <paper-button on-tap="_onCategoryClose" id$="close-category-[[index]]">
+                    <iron-icon icon="close"></iron-icon>
+                    Close Category
+                  </paper-button>
+                </div>
+            </div>
+            <tf-category-pane category="{{categoryObject.category}}" opened="{{categoryObject.opened}}" on-opened-changed="_onPaneOpenChanged">
+                <div class="layout horizontal wrap">
+                  <template is="dom-repeat" items="[[categoryObject.category.items]]">
+                    <paramplot-card active="true"
+                      data-to-load="[[_getDataToLoadFromSeriesElement(item)]]"
+                      request-manager="[[_requestManager]]" tag="[[item.tag]]"
+                      parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]"></paramplot-card>
                   </template>
-                </template>
-              </tf-paginated-view>
+                </div>
             </tf-category-pane>
           </template>
+          <paper-button on-tap="_onCategoryCreate">
+            <iron-icon icon="add"></iron-icon>
+            Add Category
+          </paper-button>
         </template>
       </div>
     </tf-dashboard-layout>
@@ -110,6 +122,25 @@
 
       .center {
         overflow-x: hidden;
+        margin-top: 20px;
+      }
+
+      .tag-aggregation {
+        margin-top: 10px;
+      }
+
+      .tag-regex {
+        display: inline-block;
+        width: 43%;
+      }
+
+      .parameter-regex {
+        display: inline-block;
+        width: 43%;
+      }
+
+      .delete-category-button {
+        display: inline-block;
       }
     </style>
   </template>
@@ -141,12 +172,18 @@
         _categoriesDomReady: Boolean,
         _categories: {
           type: Array,
-          value: () => [],
+          value: () => [{tag: '', parameter: '', category: {}, opened: true}],
         },
         _categoryByIndex: {
           type: Function,
           value: function(){
             return index => this._categories[index] 
+          }
+        },
+        _categoryItemsByIndex: {
+          type: Function,
+          value: function(){
+            return index => this._categories[index].items
           }
         },
         _requestManager: {
@@ -182,17 +219,13 @@
               const regexUpdate = (type == 'tag') ? ((val) => this._tagParameterFilters[index].tag = val) : ((val) => this._tagParameterFilters[index].parameter = val)  
               const debounced = _.debounce(r => {
                       regexUpdate(r);
-                      console.log(r);
                   }, 150, {leading: false});
               return function() {
-                console.log(value);
-                console.log(type);
                 if (value == '') {
                     // If the user cleared the field, they may be done typing, so
                     // update more quickly.
                     this.async(() => {
                         regexUpdate(value);
-                        console.log(value);
                     }, 30);
                 } else {
                     debounced(value);
@@ -205,17 +238,14 @@
       behaviors: [
         tf_dashboard_common.ArrayUpdateHelper,
       ],
-      // observers: [
-      //   '_updateCategories(_runToTag, _categoriesDomReady)',
-      // ],
       _getDataToLoadFromSeriesElement(seriesElement) {
         return [seriesElement];
       },
-      _getCategoryKey(category) {
-        return category.name
+      _getCategoryKey(categoryObject) {
+        return categoryObject.category.name
       },
-      _getPaneOpened(category) {
-        return this._paneOpened[this._getCategoryKey(category)];
+      _getPaneOpened(index) {
+        return this._paneOpened[this._getCategoryKey(this._categories[index])];
       },
       _onPaneOpenChanged(event) {
         // The event can be triggered without the pane being mounted.
@@ -278,27 +308,35 @@
       },
       _createAndUpdateCategories(){
         console.log('Now rendering the categories');
+        
+        this.set('_tagParameterFilters', this._categories.map((category) => ({tag: category.tagFilter, parameter: category.parameterFilter})));
 
         // There should be an identical number of tagFilters and parameterFilters
-        categories = this._tagParameterFilters.map((tagFilter, index, arr) => {
+        categories = this._categories.map((category, index, arr) => {
           // Obtain filtered categories for both kinds of filters
-          let categoryByTag = tf_categorization_utils.categorizeBySearchQuery(this._tags, tagFilter.tag);
-          let categoryByParameter = tf_categorization_utils.categorizeBySearchQuery(this._parameters, tagFilter.parameter);
+          let categoryByTag = tf_categorization_utils.categorizeBySearchQuery(this._tags, category.tagFilter);
+          let categoryByParameter = tf_categorization_utils.categorizeBySearchQuery(this._parameters, category.parameterFilter);
           
           let categoryItems = categoryByTag.items.map(tag => categoryByParameter.items.map(parameter => ({tag, parameter})));
-          categoryItems = categoryItems.reduce((a,b) => a.concat(b), [])
+          categoryItems = categoryItems.reduce((a,b) => a.concat(b), []);
 
           // Merge the two categories into a single category
           return {
-            name: `${categoryByTag.name} ${categoryByParameter.name}`,
-            metadata: {
-              type: categoryByTag.metadata.type,
-              validRegex: categoryByTag.metadata.validRegex && categoryByParameter.metadata.validRegex,
-              universalRegex: categoryByTag.metadata.universalRegex || categoryByParameter.metadata.universalRegex
+            tagFilter: category.tagFilter,
+            parameterFilter: category.parameterFilter,
+            category: {
+              name: `${categoryByTag.name} ${categoryByParameter.name}`,
+              metadata: {
+                type: categoryByTag.metadata.type,
+                validRegex: categoryByTag.metadata.validRegex && categoryByParameter.metadata.validRegex,
+                universalRegex: categoryByTag.metadata.universalRegex || categoryByParameter.metadata.universalRegex
+              },
+              items: categoryItems,
             },
-            items: categoryItems
+            opened: category.opened,
           }
         });
+        
         console.log('_createAndUpdateCategories');
         console.log(categories);
 
@@ -309,6 +347,22 @@
         return () => {
           return selector.selectedItemLabel;
         };
+      },
+      _onCategoryClose(event){
+        console.log(event);
+        // Get the index of the category to close
+        const id = event.target.id;
+        const index = parseInt(id.split('-')[2]);
+        
+        // remove the category from the array of categories being displayed
+        this.splice('_categories', index, 1);
+      },
+      _onCategoryCreate(event){
+        this.push('_categories', {tagFilter: '', parameterFilter: '', category: {name: 'new category'}, opened: false});
+        this.reload();
+      },
+      _aggregationMethodChange(){
+        this.reload();
       }
     });
     tf_tensorboard.registerDashboard({

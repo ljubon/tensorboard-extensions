@@ -13,7 +13,7 @@
 
 <dom-module id="paramplot-card">
   <template>
-    <tf-card-heading>[[_getSeriesDisplayNameFromDatum(tag, parameter)]]</tf-card-heading>
+    <tf-card-heading><b>[[tag]]</b> against <b>[[parameter]]</b></tf-card-heading>
     <div id="tf-line-chart-data-loader-container">
       <tf-line-chart-data-loader active="[[active]]" data-series="[[_getDataSeries(dataToLoad)]]"
         data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-name="[[_getDataLoadName]]"
@@ -24,7 +24,8 @@
     </div>
     <style>
       :host {
-        margin: 50px;
+        margin-right: 80px;
+        margin-top: 20px;
         display: block;
         width: 330px;
       }

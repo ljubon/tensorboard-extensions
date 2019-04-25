@@ -23,7 +23,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     plugin_name = 'runsenabler'
     MIN_DEFAULT = 10
 
-    def __init__(self, context: base_plugin.TBContext, actual_logir: str):
+    def __init__(self, context, actual_logir):
         """Instantiates a RunsEnablerPlugin.
 
         Args:
@@ -32,7 +32,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
         # We retrieve the multiplexer from the context and store a reference
         # to it.
-        self._multiplexer: event_multiplexer.EventMultiplexer = context.multiplexer
+        self._multiplexer = context.multiplexer
         self._context = context
         self.actual_logdir = actual_logir
         self.temp_logdir = context.logdir

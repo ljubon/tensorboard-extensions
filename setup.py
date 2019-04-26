@@ -5,7 +5,7 @@ from __future__ import print_function
 from setuptools import find_packages, setup
 
 CONSOLE_SCRIPTS = [
-    'gr_tensorboard = gr_tensorboard.main_deployed',
+    'grtensorboard = gr_tensorboard.run.main_deployed:run',
 ]
 
 REQUIRED_PACKAGES = [
@@ -13,9 +13,9 @@ REQUIRED_PACKAGES = [
 ]
 
 setup(
-    name='gr_tensorboard',
-    version='0.0.1',
-    description='GR-Tensorboard provides some extensions to vanilla Tensorflow',
+    name='grtensorboard',
+    version='0.0.2',
+    description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',
     author='Ranjeev Menon',
@@ -26,12 +26,13 @@ setup(
         'console_scripts': CONSOLE_SCRIPTS,
     },
     package_data={
-        'gr_tensorboard': [
+        'gr_tensorboard.assets': [
             'assets.zip',
         ],
     },
+    include_package_data=True,
     # Disallow python 3.0 and 3.1 which lack a 'futures' module (see above).
-    python_requires='>= 2.7, != 3.0.*, != 3.1.*',
+    python_requires='>=3.6.*',
     install_requires=REQUIRED_PACKAGES,
     # PyPI package information.
     classifiers=[
@@ -51,5 +52,5 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     license='Apache 2.0',
-    keywords='tensorflow tensorboard tensor machine learning visualizer',
+    keywords='gresearch tensorflow tensorboard tensor machine learning visualizer',
 )

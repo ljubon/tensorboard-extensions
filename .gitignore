@@ -1,4 +1,4 @@
-ranjeevm
+ranjeevm*
 /bazel-*
 /.idea
 *.pyc
@@ -7,3 +7,5 @@ ranjeevm
 paramplotdemo
 node_modules
 **/__pycache__
+build
+dist

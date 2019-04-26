@@ -26,7 +26,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
     MAX = 'Max'
     AVERAGE = 'Average'
 
-    def __init__(self, context: base_plugin.TBContext):
+    def __init__(self, context):
         """Instantiates a ParamPlotPlugin.
 
         Args:
@@ -35,7 +35,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         """
         # We retrieve the multiplexer from the context and store a reference
         # to it.
-        self._multiplexer: event_multiplexer.EventMultiplexer = context.multiplexer
+        self._multiplexer = context.multiplexer
         self._context = context
 
         self._parameter_config = {}
@@ -61,7 +61,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             run_parameters = self._parameter_config[run_name]
             for parameter in self.parameters:
                 if parameter not in run_parameters:
-                    # We assume all parameter values are numerical so NaN is a suitable sentinel value
+                    # We assume all parameter values are numerical so 0 is a suitable sentinel value (probably not but we will cross that bridge when we come to it)
                     run_parameters[parameter] = 0
 
     def _get_valid_runs(self):
@@ -124,6 +124,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
     def aggregate_tensor_events(self, tensor_events, aggregation):
         event_list = [tf.make_ndarray(event.tensor_proto).item() for event in tensor_events]
         events_ndarray = np.array(event_list)
+        
         if aggregation == ParamPlotPlugin.MIN:
             return np.amin(events_ndarray)
         elif aggregation == ParamPlotPlugin.MAX:
@@ -137,7 +138,6 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
     def _get_tensor_events_payload(self, parameter, tag, aggregation):
         processed_events = []
-        print(self._get_valid_runs())
 
         # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
         for run in self._get_valid_runs():
@@ -163,7 +163,6 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         self._compute_config()
 
         response = self._get_tensor_events_payload(parameter, tag, aggregation)
-        print(response)
         return http_util.Respond(request, response, 'application/json')
 
     @wrappers.Request.application

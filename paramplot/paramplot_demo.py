@@ -22,7 +22,7 @@ import os.path
 import random
 
 import tensorflow as tf
-import paramplot_summary
+from tensorboard.plugins.scalar import summary
 from lib.config_writer import ParamPlotConfigWriter
 
 # Directory into which to write tensorboard data.
@@ -34,9 +34,8 @@ def run(logdir, run_name, tag_value_map, parameter_map):
 
     tf.reset_default_graph()
 
-    placeholders = {tag: tf.placeholder(tf.float32) for tag in tag_value_map}
-    summary_ops = {tag: paramplot_summary.op(
-        tag, placeholders[tag]) for tag in tag_value_map}
+    placeholders = {tag: tf.placeholder(shape=(), dtype=tf.float32) for tag in tag_value_map}
+    summary_ops = {tag: summary.op(tag, placeholders[tag]) for tag in tag_value_map}
 
     run_path = os.path.join(logdir, run_name)
     writer = tf.summary.FileWriter(run_path)
@@ -50,9 +49,9 @@ def run(logdir, run_name, tag_value_map, parameter_map):
     with tf.Session() as session:
         for tag_name in tag_value_map:
             for tagvalue in tag_value_map[tag_name]:
-                summary = session.run(summary_ops[tag_name], feed_dict={
-                                    placeholders[tag_name]: tagvalue})
-                writer.add_summary(summary)
+                print(tagvalue)
+                summary_data = session.run(summary_ops[tag_name], feed_dict={placeholders[tag_name]: tagvalue})
+                writer.add_summary(summary_data)
 
     config_writer.Save()
     writer.close()
@@ -74,12 +73,12 @@ def main(unused_argv):
     def create_random_metrics():
         return {
             "single-metric": [random.uniform(0, 12)],
-            "epoch-varying-metric": [random.uniform(0,12) for _ in range(random.randint(1,20))]
+            "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1,20))]
         }
     
     def create_random_parameters():
         return {
-            "integer-parameter": random.randint(1,128),
+            "integer-parameter": random.randint(1, 128),
             "float-parameter": random.uniform(0, 600),
         }
 

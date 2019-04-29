@@ -78,8 +78,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         """
         # This is a dictionary mapping from run to (tag to string content).
         # To be clear, the values of the dictionary are dictionaries.
-        all_runs = self._multiplexer.PluginRunToTagToContent(
-            ParamPlotPlugin.plugin_name)
+        all_runs = self._multiplexer.PluginRunToTagToContent('scalars')
 
         # tagToContent is itself a dictionary mapping tag name to string
         # content. We retrieve the keys of that dictionary to obtain a

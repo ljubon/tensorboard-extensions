@@ -86,6 +86,12 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Create symlink from run in LOGDIR to TEMPDIR
         src_path = os.path.join(self.actual_logdir, run)
         dest_path = os.path.join(self.temp_logdir, run)
+        dest_dir = os.path.dirname(dest_path)
+        
+        # Create the directories of the destination symlink first
+        if not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
+
         os.symlink(src_path, dest_path)
         return dest_path
 

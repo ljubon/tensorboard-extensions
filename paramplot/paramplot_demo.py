@@ -68,7 +68,16 @@ def run_all(logdir, run_names, tag_value_maps, parameter_maps, unused_verbose=Fa
 def main(unused_argv):
     print('Saving output to %s.' % LOGDIR)
 
-    runs = ["run1", "run2", "run3", "run4", "run5", "run6", "blah", "run121", "runfhj", "daosidm", "runsomethingidontremember", "mfw"]
+    def append_dir1(run_name):
+        return os.path.join("runset1", run_name)
+    
+    def append_dir2(run_name):
+        return os.path.join("runset2", run_name)
+
+    runs = [append_dir1("run1"), append_dir1("run2"), append_dir1("run3"), append_dir1("run4"), 
+    append_dir1("run5"), append_dir2("run6"), append_dir2("blah"), append_dir2("run121"), 
+    append_dir2("runfhj"), append_dir2("daosidm"), append_dir2("runsomethingidontremember"), 
+    "mfw"]
 
     def create_random_metrics():
         return {

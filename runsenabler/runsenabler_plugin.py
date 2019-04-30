@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from subprocess import call
 import shutil
 import json
 import tensorflow as tf
@@ -93,9 +94,10 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             os.makedirs(dest_dir)
         
         try:
-            os.symlink(src_path, dest_path, target_is_directory=True)
+            os.symlink(src_path, dest_path)
         except OSError:
-            print('could not create symlink :( for run ' + run)
+            # Probably thrown because we are in windows so create the link as a ntfs junction
+            call(['mklink', '/j', dest_path, src_path])
 
         return dest_path
 
@@ -131,7 +133,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def _delete_symlink_for_run(self, run):
         # Delete symlink from run in LOGDIR to TEMPDIR
         dest_path = os.path.join(self.temp_logdir, run)
-        os.unlink(dest_path)
+
+        if os.path.islink(dest_path):
+            os.unlink(dest_path)
+        else:
+            # We assume that the link is a junction created for windows so we just need to remove the directory
+            os.rmdir(dest_path)
+
     
     def _disable_run(self, run):
         # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator

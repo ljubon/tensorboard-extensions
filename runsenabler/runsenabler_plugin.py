@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import platform
 from subprocess import call
 import shutil
 import json
@@ -93,11 +94,14 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
         
-        try:
+        if platform.system() == 'Windows':
+            # Windows doesn't interact well with os.symlink due to the SECreateSymbolicLink privilege not being granted to non-admin users
+            # create an ntfs junction instead
+            call(['mklink', '/j', dest_path, src_path], shell=True)
+        else:
+            # Other operating systems are fine
             os.symlink(src_path, dest_path)
-        except OSError:
-            # Probably thrown because we are in windows so create the link as a ntfs junction
-            call(['mklink', '/j', dest_path, src_path])
+            
 
         return dest_path
 

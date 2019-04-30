@@ -33,8 +33,13 @@ def run_main(asset_path, is_bazel):
 
     # Retrieve the actual log directory and replace it in the context with the new logdir
     original_logdir = tensorboard.flags.logdir
-    parent_dir = os.path.abspath(os.path.join(original_logdir, os.pardir))
+    # parent_dir = os.path.abspath(os.path.join(original_logdir, os.pardir))
+    parent_dir = os.path.dirname(original_logdir)
+    print("logdir provided: " + original_logdir)
+
     new_logdir = os.path.join(parent_dir, 'temp_logdir')
+
+    print("creating temporary workspace in " + new_logdir)
 
     # Create the temp dir
     if not os.path.exists(new_logdir):

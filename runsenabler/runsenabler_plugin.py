@@ -91,8 +91,12 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Create the directories of the destination symlink first
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
+        
+        try:
+            os.symlink(src_path, dest_path, target_is_directory=True)
+        except OSError:
+            print('could not create symlink :( for run ' + run)
 
-        os.symlink(src_path, dest_path)
         return dest_path
 
     def _enable_run(self, runpath, run):

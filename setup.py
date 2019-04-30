@@ -10,11 +10,12 @@ CONSOLE_SCRIPTS = [
 
 REQUIRED_PACKAGES = [
     'tensorboard >= 1.12.0',
+    'tensorflow >= 1.9.0'
 ]
 
 setup(
     name='grtensorboard',
-    version='0.0.7',
+    version='0.0.8',
     description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',

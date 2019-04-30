@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import platform
+import sys
 from subprocess import call
 import shutil
 import json
@@ -57,12 +57,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     def get_plugin_apps(self):
         """Gets all routes offered by the plugin.
-
-        This method is called by TensorBoard when retrieving all the
-        routes offered by the plugin.
-
-        Returns:
-        A dictionary mapping URL path to route that handles it.
         """
         # Note that the methods handling routes are decorated with
         # @wrappers.Request.application.
@@ -94,7 +88,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
         
-        if platform.system() == 'Windows':
+        if sys.platform in ['win32', 'cygwin']:
             # Windows doesn't interact well with os.symlink due to the SECreateSymbolicLink privilege not being granted to non-admin users
             # create an ntfs junction instead
             call(['mklink', '/j', dest_path, src_path], shell=True)

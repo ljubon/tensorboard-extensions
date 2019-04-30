@@ -37,7 +37,8 @@ def run_main(asset_path, is_bazel):
     new_logdir = os.path.join(parent_dir, 'temp_logdir')
 
     # Create the temp dir
-    os.makedirs(new_logdir)
+    if not os.path.exists(new_logdir):
+        os.makedirs(new_logdir)
 
     # swap the original logdir for the new one
     loader._actual_logdir = original_logdir

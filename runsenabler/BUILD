@@ -5,7 +5,6 @@ load("@org_tensorflow_tensorboard//tensorboard/defs:web.bzl", "tf_web_library")
 py_library(
     name = "runsenabler_loader",
     srcs = ["runsenabler_loader.py"],
-    srcs_version = "PY2AND3",
     deps = [
         ":runsenabler_plugin",
         "@org_tensorflow_tensorboard//tensorboard/plugins:base_plugin",
@@ -15,7 +14,6 @@ py_library(
 py_library(
     name = "runsenabler_plugin",
     srcs = ["runsenabler_plugin.py"],
-    srcs_version = "PY2AND3",
     deps = [
         "@org_pocoo_werkzeug",
         "@org_pythonhosted_six",

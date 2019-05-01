@@ -25,7 +25,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     plugin_name = 'runsenabler'
     MIN_DEFAULT = 10
 
-    def __init__(self, context, actual_logir):
+    def __init__(self, context, actual_logir, enabled):
         """Instantiates a RunsEnablerPlugin.
 
         Args:
@@ -38,17 +38,19 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._context = context
         self.actual_logdir = actual_logir
         self.temp_logdir = context.logdir
+        self.enabled = enabled
+        
+        if enabled:
+            # Get all the runs in the original logdirectory and set them to false by default
+            sortedRuns = self._get_runs_from_actual_logdir()
+            self._run_state = {run: False for run in sortedRuns}
 
-        # Get all the runs in the original logdirectory and set them to false by default
-        sortedRuns = self._get_runs_from_actual_logdir()
-        self._run_state = {run: False for run in sortedRuns}
-
-        # move the most recent files to the temp dir via a symlink - ensures that at least one run (likely the most relevant run) will be enabled
-        num_files = min(RunsEnablerPlugin.MIN_DEFAULT, len(sortedRuns))
-        for run in sortedRuns[-num_files:]:
-            run_name = run.replace(self.actual_logdir+os.path.sep, "")
-            runpath = self._create_symlink_for_run(run_name)
-            self._enable_run(runpath, run_name)
+            # move the most recent files to the temp dir via a symlink - ensures that at least one run (likely the most relevant run) will be enabled
+            num_files = min(RunsEnablerPlugin.MIN_DEFAULT, len(sortedRuns))
+            for run in sortedRuns[-num_files:]:
+                run_name = run.replace(self.actual_logdir+os.path.sep, "")
+                runpath = self._create_symlink_for_run(run_name)
+                self._enable_run(runpath, run_name)
     
     def _get_runs_from_actual_logdir(self):
         dir_list = sorted(list(io_wrapper.GetLogdirSubdirectories(self.actual_logdir)), key=os.path.getmtime)
@@ -75,8 +77,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         Whether this plugin is active.
         """
 
-        # The plugin is always active (will have to handle the case where )
-        return True
+        return self.enabled
     
     def _create_symlink_for_run(self, run):
         # Create symlink from run in LOGDIR to TEMPDIR

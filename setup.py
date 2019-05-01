@@ -15,7 +15,7 @@ REQUIRED_PACKAGES = [
 
 setup(
     name='grtensorboard',
-    version='0.0.8',
+    version='0.0.12',
     description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',
@@ -33,7 +33,7 @@ setup(
     },
     include_package_data=True,
     # Disallow python 3.0 and 3.1 which lack a 'futures' module (see above).
-    python_requires='>=3.6.*',
+    python_requires='>=3.4.*',
     install_requires=REQUIRED_PACKAGES,
     # PyPI package information.
     classifiers=[

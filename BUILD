@@ -5,7 +5,6 @@ load("@org_tensorflow_tensorboard//tensorboard/defs:zipper.bzl", "tensorboard_zi
 py_binary(
     name = "gr_tensorboard_main",
     srcs = ["main.py"],
-    srcs_version = "PY2AND3",
     main = "main.py",
     deps = [
         "//paramplot:paramplot_plugin",
@@ -21,7 +20,6 @@ py_binary(
     srcs = ["main_bazel.py"],
     data = ["assets.zip"],
     main = "main_bazel.py",
-    srcs_version = "PY2AND3",
     deps = [":gr_tensorboard_main"]
 )
 

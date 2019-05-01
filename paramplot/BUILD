@@ -5,7 +5,6 @@ load("@org_tensorflow_tensorboard//tensorboard/defs:web.bzl", "tf_web_library")
 py_library(
     name = "paramplot_plugin",
     srcs = ["paramplot_plugin.py"],
-    srcs_version = "PY2AND3",
     deps = [
         "@org_pythonhosted_six",
         "@org_tensorflow_tensorboard//tensorboard/backend:http_util",
@@ -17,14 +16,12 @@ py_library(
 py_binary(
     name = "paramplot_demo",
     srcs = ["paramplot_demo.py"],
-    srcs_version = "PY2AND3",
     deps = [":paramplot_summary", "//lib:config_writer"],
 )
 
 py_library(
     name = "paramplot_summary",
     srcs = ["paramplot_summary.py"],
-    srcs_version = "PY2AND3",
 )
 
 tf_web_library(

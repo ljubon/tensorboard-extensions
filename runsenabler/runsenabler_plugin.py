@@ -25,7 +25,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     plugin_name = 'runsenabler'
     MIN_DEFAULT = 10
 
-    def __init__(self, context, actual_logir, enabled):
+    def __init__(self, context, actual_logir):
         """Instantiates a RunsEnablerPlugin.
 
         Args:
@@ -38,9 +38,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._context = context
         self.actual_logdir = actual_logir
         self.temp_logdir = context.logdir
-        self.enabled = enabled
+        self.enabled = context.flags.enable_runsenabler
         
-        if enabled:
+        if self.enabled:
             # Get all the runs in the original logdirectory and set them to false by default
             sortedRuns = self._get_runs_from_actual_logdir()
             self._run_state = {run: False for run in sortedRuns}

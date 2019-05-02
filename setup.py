@@ -15,7 +15,7 @@ REQUIRED_PACKAGES = [
 
 setup(
     name='grtensorboard',
-    version='0.0.12',
+    version='0.0.13',
     description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',

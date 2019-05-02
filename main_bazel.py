@@ -10,4 +10,4 @@ from main import run_main
 
 if __name__ == "__main__":
     assets = os.path.join(tf.resource_loader.get_data_files_path(), 'assets.zip')
-    run_main(assets, True)
+    run_main(assets)

@@ -11,13 +11,20 @@
     <style include="scrollbar-style"></style>
     <style include="run-color-style"></style>
     <template>
-      <paper-input
-        id="runs-regex"
-        no-label-float
-        label="Write a regex to filter runs"
-        value="[[regex]]"
-        on-bind-value-changed="_debouncedRegexChange">
-      </paper-input>
+      <div>
+        <div>
+          <paper-input
+            id="runs-regex"
+            no-label-float
+            label="Write a regex to filter runs"
+            value="[[regex]]"
+            on-bind-value-changed="_debouncedRegexChange">
+          </paper-input>
+        </div>
+        <div>
+          <paper-button on-tap="toggleAll">Enable / Disable all runs</paper-button>
+        </div>
+      </div>
       <div id="outer-container" class="scrollbar">
         <template
           is="dom-repeat"
@@ -26,7 +33,7 @@
             <div class="icon-container checkbox-container vertical-align-container">
               <paper-checkbox
                 class="checkbox vertical-align-center"
-                id$="checkbox-[[run]]"
+                id$="[[checkboxId(run)]]"
                 name="[[run]]"
                 checked="[[isChecked(run)]]"
                 on-change="_checkboxChange">
@@ -123,10 +130,6 @@
           is: 'runsenabler-dashboard',
           properties: {
               runs: Array,
-              selectedRuns: {
-                  type: Array,
-                  notify: true,
-              },
               _requestManager: {
                   type: Object,
                   value: () => new tf_backend.RequestManager(50),
@@ -169,6 +172,7 @@
                   value: function() {
                       var debounced = _.debounce(r => {
                           this.regex = r;
+                          this.disableRunsNotMatchingRegex();
                       }, 150, {leading: false});
                       return function() {
                           var r = this.$$('#runs-regex').value;
@@ -184,11 +188,6 @@
                       };
                   },
               },
-              outSelected: {
-                  type: Array,
-                  notify: true,
-                  computed: 'computeOutSelected(namesMatchingRegex.*, selectionState.*)'
-              },
               maxNamesToEnableByDefault: {
                   // When TB first loads, if it has k or fewer names, they are all enabled
                   // by default. If there are more, then they are all disabled.
@@ -198,6 +197,19 @@
           },
           listeners: {
               'dom-change': 'synchronizeColors',
+          },
+          disableRunsNotMatchingRegex(){
+            const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);
+            console.log("disabling the following runs")
+            console.log(runsToDisable);
+
+            runsToDisable.forEach(disableRun => {
+              // We then have to disable the run if it was otherwise enabled
+              this.runSelectionState[disableRun] = false;
+            });            
+
+            // Send a request to the back end to update the run state 
+            this._updateRunState(this.runSelectionState)
           },
           _makeRegex: function(regexString) {
               try {
@@ -265,8 +277,12 @@
           _isChecked: function(run, outSelectedChange){
               return this.runSelectionState[run];
           },
+          checkboxId(run){
+            const run_key = run.replace('/', '_');
+            return `checkbox-${run_key}`;
+          },
           toggleAll: function() {
-              var anyToggledOn = this.runsMatchingRegexgetRouter
+              var anyToggledOn = this.runsMatchingRegex
                   .some((run) => this.runSelectionState[run]);
 
               var selectionStateIsDefault =
@@ -282,10 +298,25 @@
               // on, we turn everything on.
 
               var newRunsDisabled = {};
-              this.runs.forEach(function(run) {
-                  newRunsDisabled[run] = !anyToggledOn;
+              this.runs.forEach((run) => {
+                  if(this.runsMatchingRegex.includes(run)){
+                    newRunsDisabled[run] = !anyToggledOn;
+                  }else{
+                    newRunsDisabled[run] = this.runSelectionState[run]
+                  }
               });
               this.runSelectionState = newRunsDisabled;
+
+              // Notify the frontend that the checkboxes need to change and the backend that runs need to be enabled or disabled
+              this._updateRunState(this.runSelectionState);
+              this.updateCheckboxesOnToggle();
+          },
+          updateCheckboxesOnToggle(){
+            console.log("checkboxes updated");
+            this.runsMatchingRegex.forEach(run => {
+              let checkbox = this.$$(`#${this.checkboxId(run)}`);
+              checkbox.checked = this.runSelectionState[run];
+            });
           },
           ready() {
               this.reload();
@@ -305,22 +336,27 @@
                   const newRuns = Object.keys(runState);
       
                   this.set('runSelectionState', runState);
-                  console.log(runState);
                   this.set('runs', newRuns.sort());
               });
           },
           _enableRun(run){
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({
-                run
-              }));
-              return this._requestManager.request(url)
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({
+              run
+            }));
+            return this._requestManager.request(url)
           },
           _disableRun(run){
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablerun', new URLSearchParams({
-                run
-              }));
-              return this._requestManager.request(url)
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablerun', new URLSearchParams({
+              run
+            }));
+            return this._requestManager.request(url)
           },
+          _updateRunState(state){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/updaterunstate', new URLSearchParams({
+                runState: JSON.stringify(state)
+              }));
+            return this._requestManager.request(url)
+          }
         });
         tf_tensorboard.registerDashboard({
             plugin: 'runsenabler',

@@ -66,6 +66,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/enablerun': self.enablerun_route,
             '/disablerun': self.disablerun_route,
             '/runs': self.runstate_route,
+            '/updaterunstate': self.updaterunstate_route,
         }
 
     def is_active(self):
@@ -107,6 +108,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Add the run to the multiplexer (this will automatically reload the accumulators)
         self._multiplexer.AddRun(runpath, run)
         self._run_state[run] = True
+    
+    def enablerun_impl(self, run):
+        if os.path.exists(os.path.join(self.actual_logdir, run)):
+            runpath = self._create_symlink_for_run(run)
+            self._enable_run(runpath, run)
+        else:
+            print('{} does not exist anymore' % run)
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -123,16 +131,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-
-        runpath = self._create_symlink_for_run(run)
-        self._enable_run(runpath, run)
+        self.enablerun_impl(run)
 
         return http_util.Respond(request, self._run_state, 'application/json')
 
     def _delete_symlink_for_run(self, run):
         # Delete symlink from run in LOGDIR to TEMPDIR
         dest_path = os.path.join(self.temp_logdir, run)
-
         if os.path.islink(dest_path):
             os.unlink(dest_path)
         else:
@@ -144,6 +149,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator
         self._multiplexer.Reload()
         self._run_state[run] = False
+    
+    def disablerun_impl(self, run):
+        if os.path.exists(os.path.join(self.temp_logdir, run)):
+            self._delete_symlink_for_run(run)
+            self._disable_run(run)
+        else:
+            print('symlink to run: {} does not exist anymore' % run)
 
     @wrappers.Request.application
     def disablerun_route(self, request):
@@ -160,8 +172,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self._delete_symlink_for_run(run)
-        self._disable_run(run)
+        self.disablerun_impl(run)
 
         return http_util.Respond(request, self._run_state, 'application/json')
 
@@ -182,3 +193,19 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._run_state = {run: (self._run_state[run] if run in self._run_state else False)
                            for run in self._get_runs_from_actual_logdir()}
         return http_util.Respond(request, self._run_state, 'application/json')
+    
+    @wrappers.Request.application
+    def updaterunstate_route(self, request):
+        run_state = json.loads(request.args.get('runState'))
+
+        # Determine from the new state whether we need to enable or disable any states
+        for run in run_state:
+            if run in self._run_state:
+                if run_state[run] and not self._run_state[run]:
+                    # The run was enabled when it was disabled before
+                    self.enablerun_impl(run)
+                elif not run_state[run] and self._run_state[run]:
+                    # The run was disabled when it was enabled before
+                    self.disablerun_impl(run)
+        
+        return http_util.Respond(request, run_state, 'application/json')

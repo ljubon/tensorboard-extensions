@@ -110,8 +110,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._run_state[run] = True
     
     def enablerun_impl(self, run):
-        runpath = self._create_symlink_for_run(run)
-        self._enable_run(runpath, run)
+        if os.path.exists(os.path.join(self.actual_logdir, run)):
+            runpath = self._create_symlink_for_run(run)
+            self._enable_run(runpath, run)
+        else:
+            print('{} does not exist anymore' % run)
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -128,14 +131,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self.enablerun_impl(run)        
+        self.enablerun_impl(run)
 
         return http_util.Respond(request, self._run_state, 'application/json')
 
     def _delete_symlink_for_run(self, run):
         # Delete symlink from run in LOGDIR to TEMPDIR
         dest_path = os.path.join(self.temp_logdir, run)
-
         if os.path.islink(dest_path):
             os.unlink(dest_path)
         else:
@@ -149,8 +151,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._run_state[run] = False
     
     def disablerun_impl(self, run):
-        self._delete_symlink_for_run(run)
-        self._disable_run(run)
+        if os.path.exists(os.path.join(self.temp_logdir, run)):
+            self._delete_symlink_for_run(run)
+            self._disable_run(run)
+        else:
+            print('symlink to run: {} does not exist anymore' % run)
 
     @wrappers.Request.application
     def disablerun_route(self, request):
@@ -195,11 +200,12 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
         # Determine from the new state whether we need to enable or disable any states
         for run in run_state:
-            if run_state[run] and not self._run_state[run]:
-                # The run was enabled when it was disabled before
-                self.enablerun_impl(run)
-            elif not run_state[run] and self._run_state[run]:
-                # The run was disabled when it was enabled before
-                self.disablerun_impl(run)
+            if run in self._run_state:
+                if run_state[run] and not self._run_state[run]:
+                    # The run was enabled when it was disabled before
+                    self.enablerun_impl(run)
+                elif not run_state[run] and self._run_state[run]:
+                    # The run was disabled when it was enabled before
+                    self.disablerun_impl(run)
         
         return http_util.Respond(request, run_state, 'application/json')

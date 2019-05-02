@@ -169,6 +169,7 @@
                   value: function() {
                       var debounced = _.debounce(r => {
                           this.regex = r;
+                          this.disableRunsNotMatchingRegex();
                       }, 150, {leading: false});
                       return function() {
                           var r = this.$$('#runs-regex').value;
@@ -198,6 +199,19 @@
           },
           listeners: {
               'dom-change': 'synchronizeColors',
+          },
+          disableRunsNotMatchingRegex(){
+            const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);
+            console.log("disabling the following runs")
+            console.log(runsToDisable);
+
+            runsToDisable.forEach(disableRun => {
+              // We then have to disable the run if it was otherwise enabled
+              this.runSelectionState[disableRun] = false;
+            });            
+
+            // Send a request to the back end to update the run state 
+            this._updateRunState(JSON.stringify(this.runSelectionState))
           },
           _makeRegex: function(regexString) {
               try {
@@ -310,17 +324,23 @@
               });
           },
           _enableRun(run){
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({
-                run
-              }));
-              return this._requestManager.request(url)
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({
+              run
+            }));
+            return this._requestManager.request(url)
           },
           _disableRun(run){
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablerun', new URLSearchParams({
-                run
-              }));
-              return this._requestManager.request(url)
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablerun', new URLSearchParams({
+              run
+            }));
+            return this._requestManager.request(url)
           },
+          _updateRunState(runState){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/updaterunstate', new URLSearchParams({
+                runState
+              }));
+            return this._requestManager.request(url)
+          }
         });
         tf_tensorboard.registerDashboard({
             plugin: 'runsenabler',

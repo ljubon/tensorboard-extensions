@@ -46,9 +46,9 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         for run_name in self._multiplexer.Runs().keys():
             run_path = os.path.join(
                 self._context.logdir, run_name, 'runparams.json')
-            with open(run_path, 'r') as config_file_handle:
-                self._parameter_config[run_name] = json.loads(
-                    config_file_handle.read())
+            if os.path.exists(run_path):
+                with open(run_path, 'r') as config_file_handle:
+                    self._parameter_config[run_name] = json.loads(config_file_handle.read())
 
         # backfill any parameters which are missing with default values
         parameter_keys = list(
@@ -171,8 +171,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         Returns: A JSON object which is an array of parameter names (it is an assumption of the runparams schema all 
         runs will be tagged with the same parameters)
         """
-        if not self._parameter_config:
-            self._compute_config()
+        self._compute_config()
 
         response = {
             "payload": list(self.parameters)

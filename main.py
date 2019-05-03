@@ -14,8 +14,8 @@ if sys.version_info[0] < 3:
     from runsenabler import runsenabler_loader
     print(sys.version_info)
 else:
-    from .paramplot import paramplot_plugin
-    from .runsenabler import runsenabler_loader
+    from paramplot import paramplot_plugin
+    from runsenabler import runsenabler_loader
 
 def run_main(asset_path):
     # Intialise the RunsEnabler loader with some default value. The original logdir will be set after arguments have been configured

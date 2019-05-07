@@ -78,24 +78,34 @@ def main(unused_argv):
     def create_run(index):
         return run_prefix_funcs[index % 2]("run"+str(index))
 
-    int_parameters = [random.randint(1, 20) for _ in range(0, 20)]
-    float_parameters = [random.uniform(0, 100) for _ in range(0, 20)]
+    int_parameters = [random.randint(1, 20) for _ in range(0, 4)]
+    float_parameters = [random.uniform(0, 100) for _ in range(0, 4)]
+    float2_parameters = [random.uniform(0, 100) for _ in range(0, 4)]
+    float3_parameters = [random.uniform(0, 100) for _ in range(0, 4)]
 
-    parameters = [(x, y) for x in int_parameters for y in float_parameters]
+    parameters = [(x, y, z, u) for x in int_parameters for y in float_parameters for z in float2_parameters for u in float3_parameters]
     runs = [create_run(index) for (index, _) in enumerate(parameters)]
     
-
     def create_random_metrics():
         return {
             "single-metric": [random.uniform(0, 12)],
             "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1, 20))]
         }
     
-    def create_parameters(int_param, float_param):
-        return {
-            "integer-parameter": int_param,
-            "float-parameter": float_param,
-        }
+    def create_parameters(int_param, float_param, float2_param, param2electricboogaloo):
+        if random.uniform(0, 1) < 0.5:  
+            return {
+                "integer-parameter": int_param,
+                "float-parameter": float_param,
+                "super-secret-parameter": float2_param
+            }
+        else:
+            return {
+                "integer-parameter": int_param,
+                "float-parameter": float_param,
+                "super-secret-parameter": float2_param,
+                "super-duper-secret-parameter": param2electricboogaloo
+            }
 
     tag_value_maps = {runs[index]: create_random_metrics() for (index, _) in enumerate(parameters)}
 

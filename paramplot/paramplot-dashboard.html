@@ -100,7 +100,7 @@
                     <paramplot-card active="true"
                       data-to-load="[[_getDataToLoadFromSeriesElement(item)]]"
                       request-manager="[[_requestManager]]" tag="[[item.tag]]"
-                      parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]"></paramplot-card>
+                      parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]" parameter-list="[[_parameters]]"></paramplot-card>
                   </template>
                 </div>
             </tf-category-pane>
@@ -219,6 +219,7 @@
               const regexUpdate = (type == 'tag') ? ((val) => this._tagParameterFilters[index].tag = val) : ((val) => this._tagParameterFilters[index].parameter = val)  
               const debounced = _.debounce(r => {
                       regexUpdate(r);
+                      this.reload();
                   }, 150, {leading: false});
               return function() {
                 if (value == '') {
@@ -226,6 +227,7 @@
                     // update more quickly.
                     this.async(() => {
                         regexUpdate(value);
+                        this.reload();
                     }, 30);
                 } else {
                     debounced(value);
@@ -239,7 +241,7 @@
         tf_dashboard_common.ArrayUpdateHelper,
       ],
       _getDataToLoadFromSeriesElement(seriesElement) {
-        return [{tag: seriesElement.tag, parameter: seriesElement.parameter }];
+        return [seriesElement];
       },
       _getCategoryKey(categoryObject) {
         return categoryObject.category.name

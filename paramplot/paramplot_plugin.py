@@ -61,11 +61,10 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             self.parameters.update(parameter_list)
 
         for run_name in self._parameter_config:
-            run_parameters = self._parameter_config[run_name]
             for parameter in self.parameters:
-                if parameter not in run_parameters:
-                    # We assume all parameter values are numerical so 0 is a suitable sentinel value (probably not but we will cross that bridge when we come to it)
-                    run_parameters[parameter] = 0
+                if parameter not in self._parameter_config[run_name]:
+                    # We assume all parameter values are numerical so nan is a suitable sentinel value 
+                    self._parameter_config[run_name][parameter] = np.nan
 
     def _get_valid_runs(self):
         return [run for run in self._multiplexer.Runs() if run in self._parameter_config]
@@ -149,26 +148,37 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         
         return {run: run_to_paramkey(run) for run in self._get_valid_runs()}
 
-    def _get_tensor_events_payload(self, parameter, tag, aggregation):
+    def _get_tensor_events_payload(self, parameter, tag, aggregation, seriesKey):
         processed_events = {}
-        excluded_parameters = [param for param in self.parameters if not (parameter == param)]
+        excluded_parameters = [param for param in self.parameters if not (parameter == param or parameter == seriesKey)]
 
         # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run][parameter]
+            series_key_value = self._parameter_config[run][seriesKey]
 
-            # We want to return a dictionary which has a key for each series where the other parameters remain equal
-            param_key = ""
-            for p in excluded_parameters:
-                param_key = param_key+("["+p+"-"+str(self._parameter_config[run][p])+"]")
+            if not np.isnan(series_key_value):
+                # We want to return a dictionary which has a key for each series where the other parameters remain equal
+                param_key = "["+seriesKey+": "+str(series_key_value)+"]"
 
-            if param_key in processed_events:
-                processed_events[param_key] = processed_events[param_key] + [{"run": run, "payload": (param_value, self.aggregate_tensor_events(tensor_events, aggregation))}]
-            else:
-                processed_events[param_key] = [{"run": run, "payload": (param_value, self.aggregate_tensor_events(tensor_events, aggregation))}]
-             
-        return processed_events
+                # Create a two level dictionary for the series key with a sub key as the parameter value (we will then aggregate over this so each seriesKey defines a series)
+                if param_key in processed_events:
+                    if param_value in processed_events[param_key]:
+                        processed_events[param_key][param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
+                    else:
+                        processed_events[param_key][param_value] = [self.aggregate_tensor_events(tensor_events, aggregation)]
+                else:
+                    processed_events[param_key] = {param_value: [self.aggregate_tensor_events(tensor_events, aggregation)]}
+        
+        result = {}
+        # Aggregate the points so that there are only series which are keyed by the provided parameter name (seriesKey)
+        for param_key in processed_events:
+            result[param_key] = []
+            for param_value in processed_events[param_key]:
+                result[param_key].append((param_value, np.nanmean(np.array(processed_events[param_key][param_value]))))
+
+        return result
 
     @wrappers.Request.application
     def _paramdatabytag_route(self, request):
@@ -182,11 +192,12 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         parameter = request.args.get('parameter')
         tag = request.args.get('tag')
         aggregation = request.args.get('aggregation')
+        seriesKey = request.args.get('serieskey')
 
         self._multiplexer.Reload()
         self._compute_config()
 
-        response = self._get_tensor_events_payload(parameter, tag, aggregation)
+        response = self._get_tensor_events_payload(parameter, tag, aggregation, seriesKey)
         return http_util.Respond(request, response, 'application/json')
 
     @wrappers.Request.application

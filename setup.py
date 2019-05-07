@@ -9,10 +9,7 @@ CONSOLE_SCRIPTS = [
     'grtensorboard = gr_tensorboard.run.main_deployed:run',
 ]
 
-REQUIRED_PACKAGES = [
-    'tensorboard <= 1.12.0,>=1.9',
-    'tensorflow <= 1.12.0,>=1.9'
-]
+REQUIRED_PACKAGES = []
 
 setup(
     name='grtensorboard',

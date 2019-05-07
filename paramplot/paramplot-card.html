@@ -15,6 +15,15 @@
 <dom-module id="paramplot-card">
   <template>
     <tf-card-heading><b>[[tag]]</b> against <b>[[parameter]]</b></tf-card-heading>
+    <div class="parameter-key-input">
+      <paper-dropdown-menu id="series-key-selector" label="Select parameter to key series by">
+        <paper-listbox class="dropdown-content" selected="0" slot="dropdown-content">
+          <template is="dom-repeat" items="[[_seriesKeys]]" as="seriesKey">
+              <paper-item>[[seriesKey]]</paper-item>
+          </template>
+        </paper-listbox>
+      </paper-dropdown-menu>
+    </div>
     <div id="tf-line-chart-data-loader-container">
       <tf-line-chart-data-loader active="[[active]]" data-series="[[_seriesNames]]" id="loader"
         data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-url="[[getDataLoadUrl]]" 
@@ -61,6 +70,12 @@
       properties: {
         tag: String,
         parameter: String,
+        parameterList: Array,
+        _seriesKey: String,
+        _seriesKeys: {
+          type: Array,
+          computed: '_computeSeriesKeys(parameter, parameterList)'
+        },
         _nameToDataSeries: {
           type: Object,
           value: () => ({})
@@ -115,16 +130,27 @@
           '_updateChart(_nameToDataSeries)'
         ]
       },
+      _computeSeriesKeys(parameter, parameterList){
+        return parameterList.filter((p) => p !== parameter);
+      },
+      _seriesKeyChange() {
+        const selector = this.$$('#loader');
+        const updateSeriesKey = (value) => {this.set('_seriesKey', value);};
+        return (event) => {
+          updateSeriesKey(event.detail.value);
+          selector.reload();
+        }
+      },
       // This function is called when data is received from the backend.
       _loadDataCallback(){
         return (scalarChart, datum, data) => {
-          const newMapping = _.clone(this._nameToDataSeries);
+          const newMapping = {};
           
           // Loop through each series and add the series to the line chart
           for(let series_key in data){
             let counter = 0;
             const formattedData = data[series_key].map(seriesValues => {
-              const datum = seriesValues.payload;
+              const datum = seriesValues;
               return {
                 wall_time: new Date((++counter)*1000),
                 step: datum[0],
@@ -156,16 +182,19 @@
                 new URLSearchParams({
                   tag,
                   parameter, 
-                  aggregation: this.aggregationMethod()
+                  aggregation: this.aggregationMethod(),
+                  serieskey: this._seriesKey,
                 }));
       },
       _updateChart(_nameToDataSeries) {
         // Add new data series.
         console.log("updating the charts with new data")
         Object.entries(_nameToDataSeries).forEach(([name, series]) => {
-          console.log(series);
           this.$.loader.setSeriesData(name, series.getData());
         });
+      },
+      ready(){
+        this.$$('#series-key-selector').addEventListener('value-changed', this._seriesKeyChange());
       },
       reload() {
         this.$.loader.reload();

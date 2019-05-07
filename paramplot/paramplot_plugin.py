@@ -187,7 +187,6 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         self._compute_config()
 
         response = self._get_tensor_events_payload(parameter, tag, aggregation)
-        self.printer.pprint(response)
         return http_util.Respond(request, response, 'application/json')
 
     @wrappers.Request.application

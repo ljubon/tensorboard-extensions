@@ -49,7 +49,6 @@ def run(logdir, run_name, tag_value_map, parameter_map):
     with tf.Session() as session:
         for tag_name in tag_value_map:
             for tagvalue in tag_value_map[tag_name]:
-                print(tagvalue)
                 summary_data = session.run(summary_ops[tag_name], feed_dict={placeholders[tag_name]: tagvalue})
                 writer.add_summary(summary_data)
 
@@ -73,27 +72,34 @@ def main(unused_argv):
     
     def append_dir2(run_name):
         return os.path.join("runset2", run_name)
+    
+    run_prefix_funcs = [append_dir1, append_dir2]
 
-    runs = [append_dir1("run1"), append_dir1("run2"), append_dir1("run3"), append_dir1("run4"), 
-    append_dir1("run5"), append_dir2("run6"), append_dir2("blah"), append_dir2("run121"), 
-    append_dir2("runfhj"), append_dir2("daosidm"), append_dir2("runsomethingidontremember"), 
-    "mfw"]
+    def create_run(index):
+        return run_prefix_funcs[index % 2]("run"+str(index))
+
+    int_parameters = [random.randint(1, 20) for _ in range(0, 20)]
+    float_parameters = [random.uniform(0, 100) for _ in range(0, 20)]
+
+    parameters = [(x, y) for x in int_parameters for y in float_parameters]
+    runs = [create_run(index) for (index, _) in enumerate(parameters)]
+    
 
     def create_random_metrics():
         return {
             "single-metric": [random.uniform(0, 12)],
-            "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1,20))]
+            "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1, 20))]
         }
     
-    def create_random_parameters():
+    def create_parameters(int_param, float_param):
         return {
-            "integer-parameter": random.randint(1, 128),
-            "float-parameter": random.uniform(0, 600),
+            "integer-parameter": int_param,
+            "float-parameter": float_param,
         }
 
-    tag_value_maps = {run: create_random_metrics() for run in runs}
+    tag_value_maps = {runs[index]: create_random_metrics() for (index, _) in enumerate(parameters)}
 
-    parameter_maps = {run: create_random_parameters() for run in runs}
+    parameter_maps = {runs[index]: create_parameters(*params) for (index, params) in enumerate(parameters)}
 
     run_all(LOGDIR, runs, tag_value_maps, parameter_maps, unused_verbose=True)
     print('Done. Output saved to %s.' % LOGDIR)

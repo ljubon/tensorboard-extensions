@@ -239,7 +239,7 @@
         tf_dashboard_common.ArrayUpdateHelper,
       ],
       _getDataToLoadFromSeriesElement(seriesElement) {
-        return [seriesElement];
+        return [{tag: seriesElement.tag, parameter: seriesElement.parameter }];
       },
       _getCategoryKey(categoryObject) {
         return categoryObject.category.name

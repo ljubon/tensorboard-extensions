@@ -3,19 +3,20 @@ from __future__ import division
 from __future__ import print_function
 
 from setuptools import find_packages, setup
+from version import VERSION
 
 CONSOLE_SCRIPTS = [
     'grtensorboard = gr_tensorboard.run.main_deployed:run',
 ]
 
 REQUIRED_PACKAGES = [
-    'tensorboard <= 1.12.0,>1.9',
-    'tensorflow <= 1.12.0,>1.9'
+    'tensorboard <= 1.12.0,>=1.9',
+    'tensorflow <= 1.12.0,>=1.9'
 ]
 
 setup(
     name='grtensorboard',
-    version='0.0.15',
+    version=VERSION,
     description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',

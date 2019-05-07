@@ -28,10 +28,12 @@ tf_web_library(
     name = "paramplot_dashboard",
     srcs = [
         "paramplot-dashboard.html",
+        "paramplot-card.html",
+        "paramplot-helpers.html",
+        "paramplot-helpers.ts"
     ],
     path = "/paramplot",
     deps = [
-        ":paramplot_card",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_backend",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_categorization_utils",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_color_scale",
@@ -45,15 +47,20 @@ tf_web_library(
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard:registry",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_utils",
         "@org_tensorflow_tensorboard//tensorboard/components/vz_chart_helpers",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
+        "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",
         "@org_polymer_iron_collapse",
         "@org_polymer_paper_button",
         "@org_polymer_paper_checkbox",
         "@org_polymer_paper_dropdown_menu",
+        "@org_polymer_paper_icon_button",
         "@org_polymer_paper_input",
+        "@org_polymer_paper_listbox",
         "@org_polymer_paper_item",
         "@org_polymer_paper_menu",
         "@org_polymer_paper_slider",
         "@org_polymer_paper_styles",
+        "@org_polymer_paper_menu_button",
     ],
 )
 

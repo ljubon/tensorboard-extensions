@@ -5,4 +5,5 @@ cd .. &&
 rm -rf gr_tensorboard/assets/assets.zip && 
 cp gr_tensorboard/bazel-bin/assets.zip gr_tensorboard/assets/assets.zip && 
 python gr_tensorboard/setup.py sdist bdist_wheel --python-tag py3 && 
-pip3 install dist/grtensorboard-0.0.15-py3-none-any.whl
+pip3 uninstall grtensorboard && 
+pip3 install dist/grtensorboard-0.0.16-py3-none-any.whl

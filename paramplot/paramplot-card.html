@@ -10,14 +10,15 @@
 <link rel="import" href="../tf-line-chart-data-loader/tf-line-chart-data-loader.html">
 <link rel="import" href="../tf-card-heading/tf-card-heading.html">
 <link rel="import" href="../tf-dashboard-common/tf-downloader.html">
+<link rel="import" href="./paramplot-helpers.html">
 
 <dom-module id="paramplot-card">
   <template>
     <tf-card-heading><b>[[tag]]</b> against <b>[[parameter]]</b></tf-card-heading>
     <div id="tf-line-chart-data-loader-container">
-      <tf-line-chart-data-loader active="[[active]]" data-series="[[_getDataSeries(dataToLoad)]]"
-        data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-name="[[_getDataLoadName]]"
-        get-data-load-url="[[getDataLoadUrl]]" request-data="[[requestData]]" load-data-callback="[[_loadDataCallback]]"
+      <tf-line-chart-data-loader active="[[active]]" data-series="[[_seriesNames]]" id="loader"
+        data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-url="[[getDataLoadUrl]]" 
+        request-data="[[requestData]]" load-data-callback="[[_loadDataCallback()]]"
         ignore-y-outliers="[[ignoreYOutliers]]" load-key="[[tag]]" request-manager="[[requestManager]]"
         x-type="[[xType]]">
       </tf-line-chart-data-loader>
@@ -60,6 +61,14 @@
       properties: {
         tag: String,
         parameter: String,
+        _nameToDataSeries: {
+          type: Object,
+          value: () => ({})
+        },
+        _seriesNames: {
+          type: Array,
+          computed: '_computeSeriesNames(_nameToDataSeries)',
+        },
         aggregationMethod: {
           type: Function,
           value: () => 'Most-Recent'
@@ -88,32 +97,60 @@
             return new Plottable.Scales.Color().range(d3.schemeCategory10);
           }
         },
-        // This function is called when data is received from the backend.
-        _loadDataCallback: {
-          type: Object,
-          value: function () {
-            return (scalarChart, datum, data) => {
-              let counter = 0;
-              const formattedData = data.map(data => {
-                const datum = data.payload;
-                return {
-                  wall_time: new Date((++counter)*1000),
-                  step: datum[0],
-                  scalar: datum[1],
-                }
-              }).sort(function(a,b){return a.step - b.step});
-              const name = this._getSeriesNameFromDatum(datum);
-              scalarChart.setSeriesMetadata(name, datum);
-              scalarChart.setSeriesData(name, formattedData);
-            };
-          },
-          readOnly: true,
-        },
         getDataLoadUrl: {
           type: Function,
           value: function () {
             return ({ tag, parameter }) => {
-              return tf_backend.getRouter().pluginRoute(
+              return this._paramDataUrl(parameter, tag)
+            }
+          },
+        },
+        requestData: Function,
+        _expanded: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true,  // for CSS
+        },
+        observers: [
+          '_updateChart(_nameToDataSeries)'
+        ]
+      },
+      // This function is called when data is received from the backend.
+      _loadDataCallback(){
+        return (scalarChart, datum, data) => {
+          const newMapping = _.clone(this._nameToDataSeries);
+          
+          // Loop through each series and add the series to the line chart
+          for(let series_key in data){
+            let counter = 0;
+            const formattedData = data[series_key].map(seriesValues => {
+              const datum = seriesValues.payload;
+              return {
+                wall_time: new Date((++counter)*1000),
+                step: datum[0],
+                scalar: datum[1],
+              }
+            }).sort(function(a,b){return a.step - b.step});
+            
+            const name = series_key;
+            const seriesData = newMapping[name];
+
+            if(seriesData){
+              //  The series already exists so update the data in the series
+              seriesData.setData(formattedData);
+            }else{
+              // Create a series with the name
+              const series = new gr_paramplot_dashboard.DataSeries(series_key, formattedData);
+              newMapping[series_key] = series;
+            }
+          }
+          
+          this.set('_nameToDataSeries', newMapping);
+          this._updateChart(this._nameToDataSeries);
+        };
+      },
+      _paramDataUrl(parameter, tag){
+        return tf_backend.getRouter().pluginRoute(
                 'paramplot',
                 '/paramdatabytag',
                 new URLSearchParams({
@@ -121,24 +158,17 @@
                   parameter, 
                   aggregation: this.aggregationMethod()
                 }));
-            }
-          },
-        },
-        requestData: Function,
-        _getDataLoadName: {
-          type: Function,
-          value: function () {
-            return (datum) => this._getSeriesNameFromDatum(datum);
-          },
-        },
-        _expanded: {
-          type: Boolean,
-          value: false,
-          reflectToAttribute: true,  // for CSS
-        },
+      },
+      _updateChart(_nameToDataSeries) {
+        // Add new data series.
+        console.log("updating the charts with new data")
+        Object.entries(_nameToDataSeries).forEach(([name, series]) => {
+          console.log(series);
+          this.$.loader.setSeriesData(name, series.getData());
+        });
       },
       reload() {
-        this.$$('tf-line-chart-data-loader').reload();
+        this.$.loader.reload();
       },
       redraw() {
         this.$$('tf-line-chart-data-loader').redraw();
@@ -153,12 +183,8 @@
           chart.resetDomain();
         }
       },
-      _getDataSeries: (dataToLoad) => {
-        return dataToLoad.map(d => JSON.stringify([d.tag, d.parameter]));
-      },
-      // name is a stable identifier for a series.
-      _getSeriesNameFromDatum({ tag, parameter }) {
-        return JSON.stringify([tag, parameter]);
+      _computeSeriesNames(){
+        return Object.keys(this._nameToDataSeries);
       },
       // title is a visible string of a series for the UI.
       _getSeriesDisplayNameFromDatum(tag, parameter) {

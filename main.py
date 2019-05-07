@@ -14,6 +14,7 @@ if sys.version_info[0] < 3:
     from runsenabler import runsenabler_loader
     print(sys.version_info)
 else:
+    print(sys.version_info)
     from .paramplot import paramplot_plugin
     from .runsenabler import runsenabler_loader
 

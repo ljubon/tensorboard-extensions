@@ -114,7 +114,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             runpath = self._create_symlink_for_run(run)
             self._enable_run(runpath, run)
         else:
-            print('{} does not exist anymore' % run)
+            print('%s does not exist anymore' % run)
 
     @wrappers.Request.application
     def enablerun_route(self, request):

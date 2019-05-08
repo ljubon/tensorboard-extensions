@@ -1,4 +1,5 @@
 ranjeevm*
+venv
 /bazel-*
 /.idea
 *.pyc

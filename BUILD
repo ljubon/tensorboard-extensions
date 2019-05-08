@@ -9,6 +9,7 @@ py_binary(
     deps = [
         "//paramplot:paramplot_plugin",
         "//runsenabler:runsenabler_loader",
+        "//backend:program",
         "@org_pocoo_werkzeug",
         "@org_tensorflow_tensorboard//tensorboard:default",
         "@org_tensorflow_tensorboard//tensorboard:program",

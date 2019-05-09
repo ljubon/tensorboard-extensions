@@ -3,8 +3,6 @@ import os
 import signal
 import sys
 import threading
-import base64
-import json
 
 from tensorboard import program
 from tensorboard import version
@@ -24,29 +22,6 @@ except ImportError:
 
 logger = get_logger()
 
-def _cache_key(working_directory, arguments, configure_kwargs):
-    """
-    Code taken from the Tensorboard.manager module
-    """
-    if not isinstance(arguments, (list, tuple)):
-      raise TypeError(
-        "'arguments' should be a list of arguments, but found: %r "
-        "(use `shlex.split` if given a string)"
-        % (arguments,)
-      )
-    datum = {
-        "working_directory": working_directory,
-        "arguments": arguments,
-        "configure_kwargs": configure_kwargs,
-    }
-    raw = base64.b64encode(
-        json.dumps(datum, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    )
-    # `raw` is of type `bytes`, even though it only contains ASCII
-    # characters; we want it to be `str` in both Python 2 and 3.
-    return str(raw.decode("ascii"))
-
-
 class GRTensorBoard(object):
   """Class for running the GR version of TensorBoard.
   Fields:
@@ -54,7 +29,6 @@ class GRTensorBoard(object):
     assets_zip_provider: Set by constructor.
     server_class: Set by constructor.
     flags: An argparse.Namespace set by the configure() method.
-    cache_key: As `manager.cache_key`; set by the configure() method.
   """
 
   def __init__(self, plugins, assets_zip_provider):
@@ -105,11 +79,6 @@ class GRTensorBoard(object):
       loader.define_flags(parser)
     arg0 = argv[0] if argv else ''
     flags = parser.parse_args(argv[1:])  # Strip binary name from argv.
-    self.cache_key = _cache_key(
-        working_directory=os.getcwd(),
-        arguments=argv[1:],
-        configure_kwargs=kwargs,
-    )
     if absl_flags and arg0:
       # Only expose main module Abseil flags as TensorBoard native flags.
       # This is the same logic Abseil's ArgumentParser uses for determining
@@ -170,7 +139,7 @@ class GRTensorBoard(object):
     """
     # Make it easy to run TensorBoard inside other programs, e.g. Colab.
     server = self._make_server()
-    thread = threading.Thread(target=server.serve_forever, name='TensorBoard')
+    thread = threading.Thread(target=server.serve_forever, name='GR-TensorBoard')
     thread.daemon = True
     thread.start()
     return server.get_url()

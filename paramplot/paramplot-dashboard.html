@@ -274,6 +274,9 @@
             // No need to update anything if there are no changes.
             return;
           }
+
+          console.log(runToTag);
+
           const tags = tf_backend.getTags(runToTag);
           this.set('_dataNotFound', tags.length === 0);
           this.set('_tags', tags);

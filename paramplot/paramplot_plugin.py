@@ -63,7 +63,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         for run_name in self._parameter_config:
             for parameter in self.parameters:
                 if parameter not in self._parameter_config[run_name]:
-                    # We assume all parameter values are numerical so nan is a suitable sentinel value 
+                    # We assume all parameter values are numerical so nan is a suitable sentinel value
                     self._parameter_config[run_name][parameter] = np.nan
 
     def _get_valid_runs(self):
@@ -89,6 +89,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             run: list(tagToContent.keys())
             for (run, tagToContent) in all_runs.items()
         }
+
         return http_util.Respond(request, response, 'application/json')
 
     def get_plugin_apps(self):
@@ -195,7 +196,6 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         seriesKey = request.args.get('serieskey')
 
         self._multiplexer.Reload()
-        self._compute_config()
 
         response = self._get_tensor_events_payload(parameter, tag, aggregation, seriesKey)
         return http_util.Respond(request, response, 'application/json')

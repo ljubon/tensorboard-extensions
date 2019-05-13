@@ -3,15 +3,11 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import sys
-from subprocess import call
-import shutil
 import json
-import tensorflow as tf
+import pprint
 from werkzeug import wrappers
 
 from tensorboard.backend import http_util
-from tensorboard.backend.event_processing import event_multiplexer
 from tensorboard.plugins import base_plugin
 from tensorboard.backend.event_processing import io_wrapper
 
@@ -25,7 +21,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     plugin_name = 'runsenabler'
     MIN_DEFAULT = 10
 
-    def __init__(self, context, actual_logir):
+    def __init__(self, context):
         """Instantiates a RunsEnablerPlugin.
 
         Args:
@@ -35,27 +31,16 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # We retrieve the multiplexer from the context and store a reference
         # to it.
         self._multiplexer = context.multiplexer
+        self._accumulators = context.multiplexer._accumulators
+        self._accumulators_mutex = context.multiplexer._accumulators_mutex
         self._context = context
-        self.actual_logdir = actual_logir
-        self.temp_logdir = context.logdir
+        self.logdir = context.logdir
         self.enabled = context.flags.enable_runsenabler
-        
-        if self.enabled:
-            # Get all the runs in the original logdirectory and set them to false by default
-            sortedRuns = self._get_runs_from_actual_logdir()
-            self._run_state = {run: False for run in sortedRuns}
+        self.printer = pprint.PrettyPrinter(indent=4)
 
-            # move the most recent files to the temp dir via a symlink - ensures that at least one run (likely the most relevant run) will be enabled
-            num_files = min(RunsEnablerPlugin.MIN_DEFAULT, len(sortedRuns))
-            for run in sortedRuns[-num_files:]:
-                run_name = run.replace(self.actual_logdir+os.path.sep, "")
-                runpath = self._create_symlink_for_run(run_name)
-                self._enable_run(runpath, run_name)
-    
-    def _get_runs_from_actual_logdir(self):
-        dir_list = sorted(list(io_wrapper.GetLogdirSubdirectories(self.actual_logdir)), key=os.path.getmtime)
-        return [run.replace(self.actual_logdir+os.path.sep, "") for run in dir_list]
-
+        # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
+        # and register all the plugins with gr tensorboard
+        self._multiplexer.Reload()
 
     def get_plugin_apps(self):
         """Gets all routes offered by the plugin.
@@ -80,41 +65,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
         return self.enabled
     
-    def _create_symlink_for_run(self, run):
-        # Create symlink from run in LOGDIR to TEMPDIR
-        src_path = os.path.join(self.actual_logdir, run)
-        dest_path = os.path.join(self.temp_logdir, run)
-        dest_dir = os.path.dirname(dest_path)
-        
-        # Create the directories of the destination symlink first
-        if not os.path.exists(dest_dir):
-            os.makedirs(dest_dir)
-        
-        if sys.platform in ['win32', 'cygwin']:
-            # Windows doesn't interact well with os.symlink due to the SECreateSymbolicLink privilege not being granted to non-admin users
-            # create an ntfs junction instead
-            call(['mklink', '/j', dest_path, src_path], shell=True)
-        else:
-            # Other operating systems are fine
-            os.symlink(src_path, dest_path)
-            
-
-        return dest_path
-
-    def _enable_run(self, runpath, run):
-        # Call reload on the multiplexer (required so that the newly added run will be loaded as well)
-        self._multiplexer.Reload()
-
-        # Add the run to the multiplexer (this will automatically reload the accumulators)
-        self._multiplexer.AddRun(runpath, run)
-        self._run_state[run] = True
-    
-    def enablerun_impl(self, run):
-        if os.path.exists(os.path.join(self.actual_logdir, run)):
-            runpath = self._create_symlink_for_run(run)
-            self._enable_run(runpath, run)
-        else:
-            print('%s does not exist anymore' % run)
+    def _enable_run(self, run):
+        run_path = os.path.join(self.logdir, run)
+        self._multiplexer.AddRun(run_path, run)
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -131,31 +84,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self.enablerun_impl(run)
-
-        return http_util.Respond(request, self._run_state, 'application/json')
-
-    def _delete_symlink_for_run(self, run):
-        # Delete symlink from run in LOGDIR to TEMPDIR
-        dest_path = os.path.join(self.temp_logdir, run)
-        if os.path.islink(dest_path):
-            os.unlink(dest_path)
-        else:
-            # We assume that the link is a junction created for windows so we just need to remove the directory
-            os.rmdir(dest_path)
-
+        self._enable_run(run)
+        return http_util.Respond(request, self._get_runstate(), 'application/json')
     
     def _disable_run(self, run):
-        # Call reload on the multiplexer, this will detect that the directory no longer exists and delete the accumulator
-        self._multiplexer.Reload()
-        self._run_state[run] = False
-    
-    def disablerun_impl(self, run):
-        if os.path.exists(os.path.join(self.temp_logdir, run)):
-            self._delete_symlink_for_run(run)
-            self._disable_run(run)
-        else:
-            print('symlink to run: {} does not exist anymore' % run)
+        with self._multiplexer._accumulators_mutex:
+            if run in self._multiplexer._accumulators:
+                del self._multiplexer._accumulators[run]
 
     @wrappers.Request.application
     def disablerun_route(self, request):
@@ -172,9 +107,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self.disablerun_impl(run)
+        self._disable_run(run)
+        return http_util.Respond(request, self._get_runstate(), 'application/json')
 
-        return http_util.Respond(request, self._run_state, 'application/json')
+    def _get_runstate(self):
+        # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
+        run_path_names = list(map(lambda x: os.path.relpath(x, self.logdir), io_wrapper.GetLogdirSubdirectories(self.logdir)))
+        return {run: (run in self._multiplexer._accumulators) for run in run_path_names}
 
     @wrappers.Request.application
     def runstate_route(self, request):
@@ -189,23 +128,42 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             ...
         }
         """
+        run_state = self._get_runstate()
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
-        self._run_state = {run: (self._run_state[run] if run in self._run_state else False)
-                           for run in self._get_runs_from_actual_logdir()}
-        return http_util.Respond(request, self._run_state, 'application/json')
+        return http_util.Respond(request, run_state, 'application/json')
     
+    def _remove_runs(self, runs):
+        with self._multiplexer._accumulators_mutex:
+            for run in runs:
+                if run in self._multiplexer._accumulators:
+                    del self._multiplexer._accumulators[run]
+
+    def _add_runs(self, runs):
+        for run in runs:
+            run_path = os.path.join(self.logdir, run)
+            self._multiplexer.AddRun(run_path, run)
+
     @wrappers.Request.application
     def updaterunstate_route(self, request):
         run_state = json.loads(request.args.get('runState'))
+        
+        run_state_before = self._get_runstate()
+
+        runs_to_enable = []
+        runs_to_disable = []
 
         # Determine from the new state whether we need to enable or disable any states
         for run in run_state:
-            if run in self._run_state:
-                if run_state[run] and not self._run_state[run]:
-                    # The run was enabled when it was disabled before
-                    self.enablerun_impl(run)
-                elif not run_state[run] and self._run_state[run]:
-                    # The run was disabled when it was enabled before
-                    self.disablerun_impl(run)
-        
-        return http_util.Respond(request, run_state, 'application/json')
+            if run_state[run] and not run_state_before[run]:
+                # The run was enabled when it was disabled before
+                runs_to_enable.append(run)
+            elif not run_state[run] and run_state_before[run]:
+                # The run was disabled when it was enabled before
+                runs_to_disable.append(run)
+
+        # Delete the disabled runs and create the enabled ones
+        self._remove_runs(runs_to_disable)
+        self._add_runs(runs_to_enable)
+
+        new_run_state = self._get_runstate()
+        return http_util.Respond(request, new_run_state, 'application/json')

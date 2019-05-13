@@ -78,7 +78,7 @@ def main(unused_argv):
     def create_run(index):
         return run_prefix_funcs[index % 2]("run"+str(index))
 
-    int_parameters = [random.randint(1, 20) for _ in range(0, 4)]
+    int_parameters = [random.randint(1, 100) for _ in range(0, 4)]
     float_parameters = [random.uniform(0, 100) for _ in range(0, 4)]
     float2_parameters = [random.uniform(0, 100) for _ in range(0, 4)]
     float3_parameters = [random.uniform(0, 100) for _ in range(0, 4)]

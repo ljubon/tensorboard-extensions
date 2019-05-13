@@ -107,7 +107,6 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             '/tags': self.tags_route,
             '/paramdatabytag': self._paramdatabytag_route,
             '/parameters': self._parameters_route,
-            '/seriesnames': self._seriesnames_route,
         }
 
     def is_active(self):
@@ -139,19 +138,8 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             event_result = max(tensor_events, key=(lambda ev: ev.wall_time))
             return tf.make_ndarray(event_result.tensor_proto).item()
 
-    def _param_keys(self, parameter):
-        excluded_parameters = [param for param in self.parameters if not (parameter == param)]
-
-        def run_to_paramkey(r):
-            param_key = ""
-            for p in excluded_parameters:
-                param_key = param_key+("["+p+"-"+str(self._parameter_config[r][p])+"]")
-        
-        return {run: run_to_paramkey(run) for run in self._get_valid_runs()}
-
-    def _get_tensor_events_payload(self, parameter, tag, aggregation, seriesKey):
+    def _get_tensor_events_payload_by_key(self, parameter, tag, aggregation, seriesKey):
         processed_events = {}
-        excluded_parameters = [param for param in self.parameters if not (parameter == param or parameter == seriesKey)]
 
         # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
         for run in self._get_valid_runs():
@@ -180,6 +168,38 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
                 result[param_key].append((param_value, np.nanmean(np.array(processed_events[param_key][param_value]))))
 
         return result
+    
+    def _get_tensor_events_payload_no_key(self, parameter, tag, aggregation):
+        processed_events = {}
+        excluded_parameters = [param for param in self.parameters if not (parameter == param)]
+
+        for run in self._get_valid_runs():
+            tensor_events = self._multiplexer.Tensors(run, tag)
+            param_value = self._parameter_config[run][parameter]
+            param_key = ""
+            for p in excluded_parameters: 
+                param_key = param_key+("["+p+"-"+str(self._parameter_config[run][p])+"]")
+            
+            if param_key in processed_events:
+                processed_events[param_key].append((param_value, self.aggregate_tensor_events(tensor_events, aggregation)))
+            else:
+                processed_events[param_key] = [(param_value, self.aggregate_tensor_events(tensor_events, aggregation))]
+        
+        return processed_events
+    
+    def _get_tensor_events_payload_single_series(self, parameter, tag, aggregation):
+        processed_events = {}
+        
+        for run in self._get_valid_runs():
+            tensor_events = self._multiplexer.Tensors(run, tag)
+            param_value = self._parameter_config[run][parameter]
+            
+            if param_value in processed_events: 
+                processed_events[param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
+            else:
+                processed_events[param_value] = [self.aggregate_tensor_events(tensor_events, aggregation)]
+        
+        return {"All": [(param_value, np.nanmean(np.array(tensors))) for param_value, tensors in processed_events.items()]}
 
     @wrappers.Request.application
     def _paramdatabytag_route(self, request):
@@ -197,7 +217,13 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
         self._multiplexer.Reload()
 
-        response = self._get_tensor_events_payload(parameter, tag, aggregation, seriesKey)
+        if seriesKey == "All":
+            response = self._get_tensor_events_payload_single_series(parameter, tag, aggregation)
+        elif seriesKey == "None":
+            response = self._get_tensor_events_payload_no_key(parameter, tag, aggregation)
+        else:
+            response = self._get_tensor_events_payload_by_key(parameter, tag, aggregation, seriesKey)
+
         return http_util.Respond(request, response, 'application/json')
 
     @wrappers.Request.application
@@ -213,15 +239,3 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             "payload": list(self.parameters)
         }
         return http_util.Respond(request, response, 'application/json')
-    
-    @wrappers.Request.application
-    def _seriesnames_route(self, request):
-        """A route which returns the dictionary of series names when given a parameter (these will be used to index each series in a plot)
-
-        Returns: A JSON object of the form {"run1": "[parameter-value]...", ... }
-        """
-
-        parameter = request.args.get('parameter')
-        parameter_keys = self._param_keys(parameter)
-
-        return http_util.Respond(request, parameter_keys, 'application/json')

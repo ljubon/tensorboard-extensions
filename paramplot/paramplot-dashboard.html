@@ -29,8 +29,8 @@
               <template is="dom-repeat" items="[[_tags]]" as="tag">
                   <div id="tooltip-sorting" class="tag-aggregation">
                       <div>[[tag]]</div>
-                        <paper-dropdown-menu no-label-float id="dropdown-[[tag]]">
-                          <paper-menu class="dropdown-content" selected="0" slot="dropdown-content" on-iron-activate="_aggregationMethodChange">
+                        <paper-dropdown-menu no-label-float id$="[[_dropdownSelectorId(tag)]]">
+                          <paper-menu class="dropdown-content" selected="0" slot="dropdown-content">
                             <paper-item>Most-Recent</paper-item>
                             <paper-item>Min</paper-item>
                             <paper-item>Max</paper-item>
@@ -97,7 +97,7 @@
             <tf-category-pane category="{{categoryObject.category}}" opened="{{categoryObject.opened}}" on-opened-changed="_onPaneOpenChanged">
                 <div class="layout horizontal wrap">
                   <template is="dom-repeat" items="[[categoryObject.category.items]]">
-                    <paramplot-card active="true"
+                    <paramplot-card active="true" id$="[[item.tag]] (against) [[item.parameter]]"
                       data-to-load="[[_getDataToLoadFromSeriesElement(item)]]"
                       request-manager="[[_requestManager]]" tag="[[item.tag]]"
                       parameter="[[item.parameter]]" x-type="[[_xType]]" aggregation-method="[[_tagAggregationMethod(item.tag)]]" parameter-list="[[_parameters]]"></paramplot-card>
@@ -240,6 +240,9 @@
       behaviors: [
         tf_dashboard_common.ArrayUpdateHelper,
       ],
+      _dropdownSelectorId(tag){
+        return `dropdown-${tag.replace("/", "_")}`
+      },
       _getDataToLoadFromSeriesElement(seriesElement) {
         return [seriesElement];
       },
@@ -255,16 +258,24 @@
         const name = this._getCategoryKey(event.target.category);
         this._paneOpened[name] = event.detail.value;
       },
-      ready() {
-        this.reload();
-      },
-      reload() {
+      _fetchParametersAndTags(callback){
         this._fetchParameters()
           .then(() => this._fetchTags()
-            .then(() => {
-              this._updateCategories();
-              this._reloadCharts();
-            }));
+            .then(callback));
+      },
+      ready() {
+        this._fetchParametersAndTags(() => this._tags.forEach(tag => {
+          this.$$(`#${this._dropdownSelectorId(tag)}`).addEventListener('value-changed', (event) => this._reloadChartsByTag(tag));
+        }));
+      },
+      reloadCharts(){
+        this._updateCategories();
+        this._reloadCharts();
+      },
+      reload() {
+        this._fetchParametersAndTags(() => {
+          this.reloadCharts();
+        });
         console.log(this._tagParameterFilters);
       },
       _fetchTags() {
@@ -295,6 +306,15 @@
             return;
           }
           this.set('_parameters', parameterData.payload);
+        });
+      },
+      _reloadChartsByTag(tag){
+        this._updateCategories();
+        this.querySelectorAll('paramplot-card').forEach(chart => {
+          console.log(chart);
+          if(chart.getAttribute("id").includes(tag)){
+            chart.reload();
+          }
         });
       },
       _reloadCharts() {
@@ -348,7 +368,7 @@
         this.updateArrayProp('_categories', categories, this._getCategoryKey);
       },
       _tagAggregationMethod(tag){
-        var selector = document.getElementById(`dropdown-${tag}`);
+        var selector = this.$$(`#${this._dropdownSelectorId(tag)}`);
         return () => {
           return selector.selectedItemLabel;
         };
@@ -366,9 +386,6 @@
         this.push('_categories', {tagFilter: '', parameterFilter: '', category: {name: 'new category'}, opened: false});
         this.reload();
       },
-      _aggregationMethodChange(){
-        this.reload();
-      }
     });
     tf_tensorboard.registerDashboard({
       plugin: 'paramplot',

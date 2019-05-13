@@ -14,7 +14,7 @@
 
 <dom-module id="paramplot-card">
   <template>
-    <tf-card-heading><b>[[tag]]</b> against <b>[[parameter]]</b></tf-card-heading>
+    <tf-card-heading tag="[[tag]]"></tf-card-heading>
     <div class="parameter-key-input">
       <paper-dropdown-menu id="series-key-selector" label="Select parameter to key series by">
         <paper-listbox class="dropdown-content" selected="0" slot="dropdown-content">
@@ -29,15 +29,18 @@
         data-to-load="[[dataToLoad]]" color-scale="[[colorScale]]" get-data-load-url="[[getDataLoadUrl]]" 
         request-data="[[requestData]]" load-data-callback="[[_loadDataCallback()]]"
         ignore-y-outliers="[[ignoreYOutliers]]" load-key="[[tag]]" request-manager="[[requestManager]]"
-        x-type="[[xType]]">
+        x-type="[[xType]]" tooltip-columns="[[tooltipColumns]]" tooltip-position="[[tooltipPosition]]">
       </tf-line-chart-data-loader>
     </div>
+    <div class="x-axis-title">X Axis: [[parameter]]</div>
     <style>
       :host {
-        margin-right: 80px;
-        margin-top: 20px;
+        margin-left: 40px;
+        margin-right: 40px;
+        margin-top: 50px;
+        margin-bottom: 50px;
         display: block;
-        width: 330px;
+        width: 400px;
       }
 
       :host[_expanded] {
@@ -52,16 +55,22 @@
       #tf-line-chart-data-loader-container {
         height: 400px;
         width: 400px;
-        margin-right: 100px;
       }
 
       tf-card-heading {
         display: block;
         margin-bottom: 10px;
-        margin-left: 50px;
         width: 100%;
         text-align: center;
       }
+
+      .x-axis-title {
+        width: 100%;
+        text-align: center;
+        padding-top: 2%;
+        padding-left: 10%;
+      }
+
     </style>
   </template>
   <script>
@@ -91,6 +100,14 @@
         title: {
           type: String,
           value: '',
+        },
+        tooltipColumns: {
+          type: Array,
+          computed: '_computeToolTipColumns(parameter, tag)', 
+        },
+        tooltipPosition: {
+          type: String,
+          value: gr_paramplot_dashboard.PARAMPLOT_TOOLTIP_POSITION
         },
         /**
          * @type {Array<Object>}
@@ -130,8 +147,13 @@
           '_updateChart(_nameToDataSeries)'
         ]
       },
+      _computeToolTipColumns(parameter, tag){
+        return gr_paramplot_dashboard.paramplot_tooltip_columns(parameter, tag)
+      },
       _computeSeriesKeys(parameter, parameterList){
-        return parameterList.filter((p) => p !== parameter);
+        let parameterKeys = parameterList.filter((p) => p !== parameter);
+        parameterKeys.push("None", "All");
+        return parameterKeys;
       },
       _seriesKeyChange() {
         const selector = this.$$('#loader');

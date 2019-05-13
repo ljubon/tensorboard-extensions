@@ -5,7 +5,7 @@ from __future__ import print_function
 import sys
 
 from tensorboard import default
-from backend import program
+from .backend import program
 
 if sys.version_info[0] < 3:
     from paramplot import paramplot_plugin
@@ -13,8 +13,8 @@ if sys.version_info[0] < 3:
     print(sys.version_info)
 else:
     print(sys.version_info)
-    from paramplot import paramplot_plugin
-    from runsenabler import runsenabler_loader
+    from .paramplot import paramplot_plugin
+    from .runsenabler import runsenabler_loader
 
 def run_main(asset_path):
     # Intialise the RunsEnabler loader with some default value. The original logdir will be set after arguments have been configured

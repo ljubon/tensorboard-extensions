@@ -47,6 +47,7 @@ tf_web_library(
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard:registry",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_utils",
         "@org_tensorflow_tensorboard//tensorboard/components/vz_chart_helpers",
+        "@org_tensorflow_tensorboard//tensorboard/components/vz_line_chart2",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_card_heading",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_line_chart_data_loader",
         "@org_polymer_iron_collapse",

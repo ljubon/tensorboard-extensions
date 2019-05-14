@@ -219,6 +219,7 @@
         this.$$('#series-key-selector').addEventListener('value-changed', this._seriesKeyChange());
       },
       reload() {
+        console.log(`reloading chart of tag ${this.tag} and parameter ${this.parameter}`);
         this.$.loader.reload();
       },
       redraw() {

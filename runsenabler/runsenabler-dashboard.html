@@ -278,7 +278,7 @@
               return this.runSelectionState[run];
           },
           checkboxId(run){
-            const run_key = run.replace('/', '_');
+            const run_key = run.replace(/\\/g, '_').replace(/\//g, '_');
             return `checkbox-${run_key}`;
           },
           toggleAll: function() {

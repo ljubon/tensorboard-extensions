@@ -19,7 +19,8 @@
 <link rel="import" href="../tf-storage/tf-storage.html">
 <link rel="import" href="../tf-tensorboard/registry.html">
 <link rel="import" href="../tf-utils/tf-utils.html">
-<link rel="import" href="paramplot-card.html">
+<link rel="import" href="./paramplot-helpers.html">
+<link rel="import" href="./paramplot-card.html">
 <dom-module id="paramplot-dashboard">
   <template>
     <tf-dashboard-layout>
@@ -265,8 +266,15 @@
       },
       ready() {
         this._fetchParametersAndTags(() => this._tags.forEach(tag => {
-          this.$$(`#${this._dropdownSelectorId(tag)}`).addEventListener('value-changed', (event) => this._reloadChartsByTag(tag));
+          this.$$(`#${this._dropdownSelectorId(tag)}`)
+          .addEventListener(
+            'value-changed', 
+            this._aggregationMethodChange(tag)
+          );
         }));
+      },
+      _aggregationMethodChange(tag){
+        return _.debounce(event => this._reloadChartsByTag(tag), 200, {leading: false})
       },
       reloadCharts(){
         this._updateCategories();
@@ -276,7 +284,6 @@
         this._fetchParametersAndTags(() => {
           this.reloadCharts();
         });
-        console.log(this._tagParameterFilters);
       },
       _fetchTags() {
         const url = tf_backend.getRouter().pluginRoute('paramplot', '/tags');
@@ -309,9 +316,9 @@
         });
       },
       _reloadChartsByTag(tag){
+        console.log(`Aggregation method changed for ${tag}`);
         this._updateCategories();
         this.querySelectorAll('paramplot-card').forEach(chart => {
-          console.log(chart);
           if(chart.getAttribute("id").includes(tag)){
             chart.reload();
           }

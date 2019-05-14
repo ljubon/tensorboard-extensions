@@ -35,7 +35,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._accumulators_mutex = context.multiplexer._accumulators_mutex
         self._context = context
         self.logdir = context.logdir
-        self.enabled = context.flags.enable_runsenabler
         self.printer = pprint.PrettyPrinter(indent=4)
 
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
@@ -63,7 +62,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         Whether this plugin is active.
         """
 
-        return self.enabled
+        return True
     
     def _enable_run(self, run):
         run_path = os.path.join(self.logdir, run)

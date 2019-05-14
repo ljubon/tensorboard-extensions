@@ -40,5 +40,4 @@ namespace gr_paramplot_dashboard {
     ];
 
     export const PARAMPLOT_TOOLTIP_POSITION = vz_chart_helper.TooltipPosition.AUTO;
-  
 }

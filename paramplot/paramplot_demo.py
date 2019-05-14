@@ -89,7 +89,7 @@ def main(unused_argv):
     def create_random_metrics():
         return {
             "single-metric": [random.uniform(0, 12)],
-            "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1, 20))]
+            "epoch-varying-metric": [random.uniform(0, 12) for _ in range(random.randint(1, 200))]
         }
     
     def create_parameters(int_param, float_param, float2_param, param2electricboogaloo):

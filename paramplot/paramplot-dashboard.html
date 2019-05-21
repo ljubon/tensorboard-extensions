@@ -242,7 +242,11 @@
         tf_dashboard_common.ArrayUpdateHelper,
       ],
       _dropdownSelectorId(tag){
-        return `dropdown-${tag.replace("/", "_")}`
+        let tag_id = tag.toLowerCase();
+        tag_id = tag_id.replace(/\s/g, "-");
+        tag_id = tag_id.replace(/[^\w\-]/g, "-");
+        tag_id = tag_id.trim();
+        return `dropdown-${tag_id}`;
       },
       _getDataToLoadFromSeriesElement(seriesElement) {
         return [seriesElement];

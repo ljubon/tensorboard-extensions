@@ -5,11 +5,13 @@ from __future__ import print_function
 import os
 import json
 import pprint
+import re
 from werkzeug import wrappers
 
 from tensorboard.backend import http_util
 from tensorboard.plugins import base_plugin
 from tensorboard.backend.event_processing import io_wrapper
+from tensorboard.backend.event_processing import plugin_event_accumulator as event_accumulator
 
 
 class RunsEnablerPlugin(base_plugin.TBPlugin):
@@ -31,8 +33,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # We retrieve the multiplexer from the context and store a reference
         # to it.
         self._multiplexer = context.multiplexer
-        self._accumulators = context.multiplexer._accumulators
-        self._accumulators_mutex = context.multiplexer._accumulators_mutex
+        self._accumulator_cache = {}
         self._context = context
         self.logdir = context.logdir
         self.printer = pprint.PrettyPrinter(indent=4)
@@ -50,7 +51,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/enablerun': self.enablerun_route,
             '/disablerun': self.disablerun_route,
             '/runs': self.runstate_route,
-            '/updaterunstate': self.updaterunstate_route,
+            '/enableall': self.enableall_route,
+            '/disableall': self.disableall_route,
+            '/disablenonmatching': self.disablenonmatching_route,
         }
 
     def is_active(self):
@@ -84,7 +87,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
         run = request.args.get('run')
         self._enable_run(run)
-        return http_util.Respond(request, self._get_runstate(), 'application/json')
+        return http_util.Respond(request, {}, 'application/json')
     
     def _disable_run(self, run):
         with self._multiplexer._accumulators_mutex:
@@ -107,11 +110,14 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
         run = request.args.get('run')
         self._disable_run(run)
-        return http_util.Respond(request, self._get_runstate(), 'application/json')
+        return http_util.Respond(request, {}, 'application/json')
+
+    def _get_runs(self):
+        return list(map(lambda x: os.path.relpath(x, self.logdir), io_wrapper.GetLogdirSubdirectories(self.logdir)))
 
     def _get_runstate(self):
         # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
-        run_path_names = list(map(lambda x: os.path.relpath(x, self.logdir), io_wrapper.GetLogdirSubdirectories(self.logdir)))
+        run_path_names = self._get_runs()
         return {run: (run in self._multiplexer._accumulators) for run in run_path_names}
 
     @wrappers.Request.application
@@ -127,42 +133,52 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             ...
         }
         """
-        run_state = self._get_runstate()
+        self.run_state = self._get_runstate()
+        self._multiplexer.Reload()
+
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
-        return http_util.Respond(request, run_state, 'application/json')
+        return http_util.Respond(request, self.run_state, 'application/json')
     
-    def _remove_runs(self, runs):
+    def _remove_runs_by_regex(self, regex):
         with self._multiplexer._accumulators_mutex:
+            runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and re.search(regex, r)]
             for run in runs:
-                if run in self._multiplexer._accumulators:
-                    del self._multiplexer._accumulators[run]
+                del self._multiplexer._accumulators[run]
+                del self._multiplexer._paths[run]
 
-    def _add_runs(self, runs):
-        for run in runs:
-            run_path = os.path.join(self.logdir, run)
-            self._multiplexer.AddRun(run_path, run)
-
+    def _add_runs_by_regex(self, regex):
+            runs = [r for r in self._get_runs() if re.search(regex, r)]
+            print("number of runs to load: " + str(len(runs)))
+            for i, run in enumerate(runs):
+                self._enable_run(run)
+                print("added run %d: %s" % (i, run))
+    
+    def _remove_runs_not_matching_regex(self, regex):
+        with self._multiplexer._accumulators_mutex:
+            runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and not re.search(regex, r)]
+            for run in runs:
+                del self._multiplexer._accumulators[run]
+                del self._multiplexer._paths[run]
+    
+    def _format_regex(self, regex):
+        regex = regex[1:-1]
+        regex = regex if regex != "(:?)" else ".*"
+        return re.compile(regex)
+     
     @wrappers.Request.application
-    def updaterunstate_route(self, request):
-        run_state = json.loads(request.args.get('runState'))
-        
-        run_state_before = self._get_runstate()
-
-        runs_to_enable = []
-        runs_to_disable = []
-
-        # Determine from the new state whether we need to enable or disable any states
-        for run in run_state:
-            if run_state[run] and not run_state_before[run]:
-                # The run was enabled when it was disabled before
-                runs_to_enable.append(run)
-            elif not run_state[run] and run_state_before[run]:
-                # The run was disabled when it was enabled before
-                runs_to_disable.append(run)
-
-        # Delete the disabled runs and create the enabled ones
-        self._remove_runs(runs_to_disable)
-        self._add_runs(runs_to_enable)
-
-        new_run_state = self._get_runstate()
-        return http_util.Respond(request, new_run_state, 'application/json')
+    def enableall_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        self._add_runs_by_regex(regex)
+        return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def disableall_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        self._remove_runs_by_regex(regex)
+        return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def disablenonmatching_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        self._remove_runs_not_matching_regex(regex)
+        return http_util.Respond(request, {}, 'application/json')

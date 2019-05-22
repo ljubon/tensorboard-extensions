@@ -13,6 +13,8 @@ from tensorboard.plugins import base_plugin
 from tensorboard.backend.event_processing import io_wrapper
 from tensorboard.backend.event_processing import plugin_event_accumulator as event_accumulator
 
+from .runsenabler_profiler import RunsEnablerLogger, RunsEnablerProfiler
+
 
 class RunsEnablerPlugin(base_plugin.TBPlugin):
     """A plugin that controls which runs tensorboard can inspect"""
@@ -41,6 +43,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
         # and register all the plugins with gr tensorboard
         self._multiplexer.Reload()
+
+        # Create the runsenabler log file which contains profiling times for all the methods
+        self.logger = RunsEnablerLogger()
 
     def get_plugin_apps(self):
         """Gets all routes offered by the plugin.
@@ -133,8 +138,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             ...
         }
         """
-        self.run_state = self._get_runstate()
-        self._multiplexer.Reload()
+        self.logger.log_message_info("executing runstate_route (/runs)")
+        with RunsEnablerProfiler(self.logger, "_get_runstate()"):
+            self.run_state = self._get_runstate()
+        with RunsEnablerProfiler(self.logger, "_multiplexer.Reload()"):
+            self._multiplexer.Reload()
 
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
@@ -142,24 +150,33 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def _remove_runs_by_regex(self, regex):
         with self._multiplexer._accumulators_mutex:
             runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and re.search(regex, r)]
-            for run in runs:
-                del self._multiplexer._accumulators[run]
-                del self._multiplexer._paths[run]
+            with RunsEnablerProfiler(self.logger, "removing all the runs which match the regex"):
+                for run in runs:
+                    with RunsEnablerProfiler(self.logger, run):
+                        if run in self._multiplexer._accumulators:
+                            del self._multiplexer._accumulators[run]
+                        if run in self._multiplexer._paths:
+                            del self._multiplexer._paths[run]
 
     def _add_runs_by_regex(self, regex):
             runs = [r for r in self._get_runs() if re.search(regex, r)]
             print("number of runs to load: " + str(len(runs)))
-            for i, run in enumerate(runs):
-                self._enable_run(run)
-                print("added run %d: %s" % (i, run))
-    
+            with RunsEnablerProfiler(self.logger, "adding all the runs which match the regex"):
+                for i, run in enumerate(runs):
+                    with RunsEnablerProfiler(self.logger, run):
+                        self._enable_run(run)
+        
     def _remove_runs_not_matching_regex(self, regex):
         with self._multiplexer._accumulators_mutex:
             runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and not re.search(regex, r)]
-            for run in runs:
-                del self._multiplexer._accumulators[run]
-                del self._multiplexer._paths[run]
-    
+            with RunsEnablerProfiler(self.logger, "removing all the runs which do not match the regex"):
+                for run in runs:
+                    with RunsEnablerProfiler(self.logger, run):
+                        if run in self._multiplexer._accumulators:
+                            del self._multiplexer._accumulators[run]
+                        if run in self._multiplexer._paths:
+                            del self._multiplexer._paths[run]
+            
     def _format_regex(self, regex):
         regex = regex[1:-1]
         regex = regex if regex != "(:?)" else ".*"
@@ -168,17 +185,20 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     @wrappers.Request.application
     def enableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
+        self.logger.log_message_info("executing enableall_route (/enableall)")
         self._add_runs_by_regex(regex)
         return http_util.Respond(request, {}, 'application/json')
     
     @wrappers.Request.application
     def disableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
+        self.logger.log_message_info("executing disableall_route (/disableall)")
         self._remove_runs_by_regex(regex)
         return http_util.Respond(request, {}, 'application/json')
     
     @wrappers.Request.application
     def disablenonmatching_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
+        self.logger.log_message_info("executing disableallnonmatching_route (/disableallnonmatching)")
         self._remove_runs_not_matching_regex(regex)
         return http_util.Respond(request, {}, 'application/json')

@@ -13,7 +13,7 @@ py_library(
 
 py_library(
     name = "runsenabler_plugin",
-    srcs = ["runsenabler_plugin.py"],
+    srcs = ["runsenabler_plugin.py", "runsenabler_profiler.py"],
     deps = [
         "@org_pocoo_werkzeug",
         "@org_pythonhosted_six",

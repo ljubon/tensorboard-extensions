@@ -22,7 +22,8 @@
           </paper-input>
         </div>
         <div>
-          <paper-button on-tap="toggleAll">Enable / Disable all runs</paper-button>
+          <paper-button on-tap="enableAll">Enable all runs</paper-button>
+          <paper-button on-tap="disableAll">Disable all runs</paper-button>
         </div>
       </div>
       <div id="outer-container" class="scrollbar">
@@ -204,7 +205,7 @@
             console.log(runsToDisable);            
 
             // Send a request to the back end to update the run state to toggle all those runs which do not match the regex  
-            this._requestDisableNonMatchingRuns().then(() => {
+            this._disableRunsNotMatchingRegex().then(() => {
               runsToDisable.forEach(disableRun => {
                 // We then have to disable the run if it was otherwise enabled
                 this.runSelectionState[disableRun] = false;
@@ -284,36 +285,33 @@
             run_key = run_key.trim();
             return `checkbox-${run_key}`;
           },
-          toggleAll: function() {
-              var anyToggledOn = this.runsMatchingRegex
-                  .some((run) => this.runSelectionState[run]);
-
-              var selectionStateIsDefault =
-                  Object.keys(this.runSelectionState).length == 0;
-
-              var defaultOff = this.runsMatchingRegex.length > this.maxRunsToEnableByDefault;
-              // We have runs toggled either if some were explicitly toggled on, or if
-              // we are in the default state, and there are few enough that we default
-              // to toggling on.
-              anyToggledOn = anyToggledOn || selectionStateIsDefault && !defaultOff;
-
-              // If any are toggled on, we turn everything off. Or, if none are toggled
-              // on, we turn everything on.
-
-              var newRunsDisabled = {};
-              this.runs.forEach((run) => {
-                  if(this.runsMatchingRegex.includes(run)){
-                    newRunsDisabled[run] = !anyToggledOn;
-                  }else{
-                    newRunsDisabled[run] = this.runSelectionState[run]
-                  }
-              });
-              this.runSelectionState = newRunsDisabled;
-
-              // Notify the frontend that the checkboxes need to change and the backend that runs need to be enabled or disabled
-              this._updateRunState(anyToggledOn).then(() => {
+          enableAll(){
+            let allEnabledBefore = true;
+            this.runsMatchingRegex.forEach((run) => {
+              allEnabledBefore = allEnabledBefore && this.runSelectionState[run];
+              this.runSelectionState[run] = true;
+            });
+            if(!allEnabledBefore){
+              this._enableAllRunsMatchingRegex().then(() => {
                 this.updateCheckboxesOnToggle();
               });
+            }else{
+              this.updateCheckboxesOnToggle();
+            }
+          },
+          disableAll(){
+            let allDisabledBefore = true;
+            this.runsMatchingRegex.forEach((run) => {
+              allDisabledBefore = allDisabledBefore && !this.runSelectionState[run];
+              this.runSelectionState[run] = false;
+            });
+            if(!allDisabledBefore){
+              this._disableAllRunsMatchingRegex().then(() => {
+                this.updateCheckboxesOnToggle();
+              });
+            }else{
+              this.updateCheckboxesOnToggle();
+            }
           },
           updateCheckboxesOnToggle(){
             console.log("checkboxes updated");
@@ -354,18 +352,15 @@
             }));
             return this._requestManager.request(url);
           },
-          _updateRunState(anyToggledOn){
-            if(anyToggledOn){
-              // We want to toggle all the checkboxes off
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableall', new URLSearchParams({regex: this._regex}));
-              return this._requestManager.request(url);
-            }else{
-              // We wan to toggle all the checkboxes on
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableall', new URLSearchParams({regex: this._regex}));
-              return this._requestManager.request(url);
-            }
+          _disableAllRunsMatchingRegex(){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableall', new URLSearchParams({regex: this._regex}));
+            return this._requestManager.request(url);
           },
-          _requestDisableNonMatchingRuns(){
+          _enableAllRunsMatchingRegex(){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableall', new URLSearchParams({regex: this._regex}));
+            return this._requestManager.request(url);
+          },
+          _disableRunsNotMatchingRegex(){
             const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablenonmatching', new URLSearchParams({regex: this._regex}));
             return this._requestManager.request(url);
           }

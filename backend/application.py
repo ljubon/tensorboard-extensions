@@ -13,7 +13,7 @@ def gr_tensorboard_wsgi(flags, plugin_loaders, assets_zip_provider):
                                                                 size_guidance=size_guidance,
                                                                 tensor_size_guidance=None,
                                                                 purge_orphaned_data=True,
-                                                                max_reload_threads=None)
+                                                                max_reload_threads=flags.max_reload_threads)
     plugin_name_to_instance = {}
     context = base_plugin.TBContext(
         flags=flags,

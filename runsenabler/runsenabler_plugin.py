@@ -49,6 +49,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
         # and register all the plugins with gr tensorboard
         self._multiplexer.Reload()
+        # self.runs = self._get_runs()
 
         # Create the runsenabler log file which contains profiling times for all the methods
         self.logger = RunsEnablerLogger() if context.flags.enable_profiling else NoOpLogger()
@@ -127,11 +128,21 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def _get_runs(self):
         return list(map(lambda x: os.path.relpath(x, self.logdir), io_wrapper.GetLogdirSubdirectories(self.logdir)))
 
-    def _get_runstate(self):
+    def _get_runstate(self, enable_new_runs=False):
         # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
         run_path_names = self._get_runs()
-        return {run: (run in self._multiplexer._accumulators) for run in run_path_names}
-
+        
+        # Determine the set of runs which have been newly added (i.e. in the new run set but not the old)
+        old_run_set = set(self.runs)
+        new_run_set = set(run_path_names)
+        newly_added_runs = new_run_set.difference(old_run_set)
+        
+        # Update the runs which are currently being 
+        new_run_state = {run: (run in self._multiplexer._accumulators or (enable_new_runs and run in newly_added_runs)) for run in run_path_names}
+        self.runs = run_path_names
+        
+        return new_run_state, newly_added_runs
+        
     @wrappers.Request.application
     def runstate_route(self, request):
         """Route to return the run state (dictionary mapping run names to whether they enabled)
@@ -145,12 +156,19 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             ...
         }
         """
+        enable_new_runs = request.args.get('enableNewRuns')
+
         self.logger.log_message_info("executing runstate_route (/runs)")
-        with self.profiler.TimeBlock("_multiplexer.Reload()"):
-            self._multiplexer.Reload()
-        with self.profiler.TimeBlock("_get_runstate()"):
-            # Handles the case where new runs are added after tensorboard has begun 
-            self.run_state = self._get_runstate()
+        with self.profiler.ProfileBlock():
+            with self.profiler.TimeBlock("_get_runstate()"):
+                # Handles the case where new runs are added after tensorboard has begun 
+                self.run_state, new_runs = self._get_runstate(enable_new_runs)
+                # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
+                # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
+                if enable_new_runs and len(new_runs) > 0:
+                    self._add_runs(new_runs)
+            with self.profiler.TimeBlock("_multiplexer.Reload()"):
+                self._multiplexer.Reload()
 
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')

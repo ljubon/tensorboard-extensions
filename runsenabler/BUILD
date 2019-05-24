@@ -35,6 +35,7 @@ tf_web_library(
         "@org_tensorflow_tensorboard//tensorboard/components/tf_imports:polymer",
         "@org_tensorflow_tensorboard//tensorboard/components/tf_tensorboard:registry",
         "@org_polymer_paper_button",
+        "@org_polymer_paper_spinner",
         "@org_polymer_paper_dialog",
         "@org_polymer_paper_styles",
     ],

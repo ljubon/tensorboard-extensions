@@ -1,5 +1,6 @@
 <link rel="import" href="../paper-button/paper-button.html">
 <link rel="import" href="../paper-dialog/paper-dialog.html">
+<link rel="import" href="../paper-spinner/paper-spinner.html">
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../tf-backend/tf-backend.html">
 <link rel="import" href="../tf-color-scale/tf-color-scale.html">
@@ -10,42 +11,54 @@
 <dom-module id="runsenabler-dashboard">
     <style include="scrollbar-style"></style>
     <style include="run-color-style"></style>
-    <template>
-      <div>
+    <template class="main-content">
+      <template class="runenabler-spinner" is="dom-if" if="[[_isReloading]]">
+        <paper-spinner active alt="Now loading runs..."></paper-spinner>
+      </template>
+      <template class="runsenabler-content" is="dom-if" if="[[!_isReloading]]">
         <div>
-          <paper-input
-            id="runs-regex"
-            no-label-float
-            label="Write a regex to filter runs"
-            value="[[regex]]"
-            on-bind-value-changed="_debouncedRegexChange">
-          </paper-input>
-        </div>
-        <div>
-          <paper-button on-tap="enableAll">Enable all runs</paper-button>
-          <paper-button on-tap="disableAll">Disable all runs</paper-button>
-        </div>
-      </div>
-      <div id="outer-container" class="scrollbar">
-        <template
-          is="dom-repeat"
-          items="[[runsMatchingRegex]]" as="run">
-          <div class="run-row">
-            <div class="icon-container checkbox-container vertical-align-container">
-              <paper-checkbox
-                class="checkbox vertical-align-center"
-                id$="[[checkboxId(run)]]"
-                name="[[run]]"
-                checked="[[isChecked(run)]]"
-                on-change="_checkboxChange">
-            </paper-checkbox>
-            </div>
-            <div class="item-label-container">
-              <span>[[run]]</span>
-            </div>
+          <div>
+            <paper-input
+              id="runs-regex"
+              no-label-float
+              label="Write a regex to filter runs"
+              value="[[regex]]"
+              on-bind-value-changed="_debouncedRegexChange">
+            </paper-input>
           </div>
-        </template>
-      </div>
+          <div>
+            <paper-button on-tap="enableAll">Enable all runs</paper-button>
+            <paper-button on-tap="disableAll">Disable all runs</paper-button>
+            <paper-checkbox name="enable-new-runs-checkbox" checked="{{_enableNewRuns}}"></paper-checkbox>
+            <div class="reload-help">Reload the dashboard to update the loaded runs</div>
+          </div>
+        </div>
+        <div class="horizontal">
+          <div id="outer-container" class="scrollbar">
+            <template
+              is="dom-repeat"
+              items="[[runsMatchingRegex]]" as="run">
+              <div class="run-row">
+                <div class="icon-container checkbox-container vertical-align-container">
+                  <paper-checkbox
+                    class="checkbox vertical-align-center"
+                    name="[[run]]"
+                    checked="[[isChecked(run)]]"
+                    on-change="_checkboxChange">
+                </paper-checkbox>
+                </div>
+                <div class="item-label-container">
+                  <span>[[run]]</span>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="scrollbar">
+
+          </div>
+        </div>  
+
+      </template>
     <style>
       paper-input {
         --paper-input-container-focus-color: var(--tb-orange-strong);
@@ -56,6 +69,26 @@
           font-size: 14px;
         };
       }
+
+      .reload-help {
+        padding: 5px;
+      }
+
+      .runenabler-spinner{
+        width: 100%;
+        height: 100%;
+        background: rgba(255,255,255,1.0);
+      }
+
+      paper-spinner {
+        display: block;
+        margin: auto auto auto auto; 
+        width: 100px;
+        top: 50%;
+        height: 100px;
+        margin-top: -50px;  
+      }
+
       :host {
         display: flex;
         flex-direction: column;
@@ -65,7 +98,6 @@
         overflow-y: auto;
         overflow-x: hidden;
         width: 100%;
-        height: 0; /* Quirk to make firefox add scrolling instead of expand div */
         flex-grow: 1;
         flex-shrink: 1;
         word-wrap: break-word;
@@ -131,6 +163,7 @@
           is: 'runsenabler-dashboard',
           properties: {
               runs: Array,
+              _isReloading: Boolean,
               _requestManager: {
                   type: Object,
                   value: () => new tf_backend.RequestManager(50),
@@ -151,6 +184,18 @@
                   type: Array,
                   computed: 'computeNamesMatchingRegex(runs, _regex)'
               },  // Runs that match the regex
+              _runGroupObject: {
+                type: Object,
+                computed: 'computeRunGroupObject(_regex, runSelectionState)',
+              },
+              _runGroups: {
+                type: Array,
+                computed: 'computeRunGroups(_runGroupObject, _runGroupKeys)',
+              },
+              _runGroupKeys: {
+                type: Array,
+                computed: 'computeRunGroupKeys(_runGroupObject)',
+              },
               runSelectionState: {
                   // if a name is explicitly enabled, True, if explicitly disabled, False.
                   // if undefined, default value (enable for first k names, disable after).
@@ -164,6 +209,7 @@
                       return (run) => this.runSelectionState[run]
                   },
               },
+              _enableNewRuns: Boolean,
               _debouncedRegexChange: {
                   type: Object,
                   // Updating the regex can be slow, because it involves updating styles
@@ -198,6 +244,23 @@
           },
           listeners: {
               'dom-change': 'synchronizeColors',
+          },
+          computeRunGroups(runGroupObject, runGroupKeys){
+            //TODO
+          },
+          computeRunGroupKeys(runGroupObject){
+            let runGroupKeys = Object.entries(runGroupObject).map((runGroup) => ({
+              runKey: runGroup[0],
+              checked: runGroup[1].some(run => run.checked)
+            }));
+            return runGroupKeys;
+          },
+          computeRunGroupObject(regex, runSelectionState){
+            let runGroupObject = Object.entries(runSelectionState).reduce((result, obj) => {
+              const key = obj[0].match(regex)[0];
+              (result[key] = result[key] || []).push({run: obj[0], checked: obj[1]});
+            }, {});
+            return runGroupObject;
           },
           disableRunsNotMatchingRegex(){
             const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);
@@ -278,13 +341,6 @@
           _isChecked: function(run, outSelectedChange){
               return this.runSelectionState[run];
           },
-          checkboxId(run){
-            let run_key = run.toLowerCase();
-            run_key = run_key.replace(/\s/g, "-");
-            run_key = run_key.replace(/[^\w\-]/g, "-");
-            run_key = run_key.trim();
-            return `checkbox-${run_key}`;
-          },
           enableAll(){
             let allEnabledBefore = true;
             this.runsMatchingRegex.forEach((run) => {
@@ -326,8 +382,10 @@
               this._fetchRuns();
           },
           _fetchRuns(){
-              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/runs');
+              const url = tf_backend.getRouter().pluginRoute('runsenabler', '/runs', new URLSearchParams({ enableNewRuns: this._enableNewRuns }));
+              this.set('_isReloading', true);
               return this._requestManager.request(url).then(runState => {
+                  this.set('_isReloading', false);
                   if (_.isEqual(runState, this.runSelectionState)) {
                       // No need to update anything if there are no changes.
                       return;

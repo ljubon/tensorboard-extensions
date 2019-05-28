@@ -7,7 +7,7 @@ from tensorboard.backend import application
 from tensorboard.backend.event_processing import plugin_event_multiplexer
 
 def gr_tensorboard_wsgi(flags, plugin_loaders, assets_zip_provider):
-    size_guidance = {plugin_event_accumulator.TENSORS: 500}
+    size_guidance = {plugin_event_accumulator.TENSORS: 50}
     run_path_map = _getRunPathMapFromLogdir(flags.logdir, flags.enable_first_N_runs)
     gr_multiplexer = plugin_event_multiplexer.EventMultiplexer(run_path_map=run_path_map,
                                                                 size_guidance=size_guidance,

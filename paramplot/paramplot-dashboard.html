@@ -116,6 +116,7 @@
 
     <style include="dashboard-style"></style>
     <style>
+      /* SARAH: Also put this in separate file */
       .no-data-warning {
         max-width: 540px;
         margin: 80px auto 0 auto;
@@ -146,7 +147,7 @@
     </style>
   </template>
 
-  <script>
+  <script> // Recommend putting this in a separate file
     Polymer({
       is: 'paramplot-dashboard',
       properties: {
@@ -223,7 +224,7 @@
                       this.reload();
                   }, 150, {leading: false});
               return function() {
-                if (value == '') {
+                if (value == '') { // SARAH: Suggest setting up a code linter for javascript - will probably recommend using === instead of == here and above, also "" vs '' consistency and some common errors. Should be possible to plug into build system
                     // If the user cleared the field, they may be done typing, so
                     // update more quickly.
                     this.async(() => {
@@ -342,7 +343,7 @@
 
         this._createAndUpdateCategories();
       },
-      _createAndUpdateCategories(){
+      _createAndUpdateCategories(){ // SARAH: could this function (and othes in this list) be defined as standalone functions?
         console.log('Now rendering the categories');
         
         this.set('_tagParameterFilters', this._categories.map((category) => ({tag: category.tagFilter, parameter: category.parameterFilter})));

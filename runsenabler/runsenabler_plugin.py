@@ -9,6 +9,7 @@ import re
 
 import queue
 import threading
+import concurrent.futures
 
 from werkzeug import wrappers
 from collections import deque
@@ -19,7 +20,6 @@ from tensorboard.backend.event_processing import io_wrapper
 from tensorboard.backend.event_processing import plugin_event_accumulator as event_accumulator
 
 from .runsenabler_profiler import RunsEnablerLogger, RunsEnablerProfiler, NoOpLogger, NoOpProfiler
-
 
 class RunsEnablerPlugin(base_plugin.TBPlugin):
     """A plugin that controls which runs tensorboard can inspect"""
@@ -49,7 +49,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
         # and register all the plugins with gr tensorboard
         self._multiplexer.Reload()
-        # self.runs = self._get_runs()
+        self.runs = self._get_runs()
 
         # Create the runsenabler log file which contains profiling times for all the methods
         self.logger = RunsEnablerLogger() if context.flags.enable_profiling else NoOpLogger()
@@ -67,6 +67,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/enableall': self.enableall_route,
             '/disableall': self.disableall_route,
             '/disablenonmatching': self.disablenonmatching_route,
+            '/enableallsubstring': self.enableallsubstring_route,
+            '/disableallsubstring': self.disableallsubstring_route,
         }
 
     def is_active(self):
@@ -172,82 +174,53 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
-    
-    def _remove_runs_by_regex(self, regex):
-        with self._multiplexer._accumulators_mutex:
-            runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and re.search(regex, r)]
-            with self.profiler.TimeBlock("removing all the runs which match the regex"):
-                for run in runs:
-                    with self.profiler.TimeBlock(run):
-                        if run in self._multiplexer._accumulators:
-                            del self._multiplexer._accumulators[run]
-                        if run in self._multiplexer._paths:
-                            del self._multiplexer._paths[run]
 
     def _add_runs(self, runs):
-        # create an items queue containing runs which will be accessed by multiple threads
-        items_queue = queue.Queue()
         for run in runs:
-            items_queue.put(run)
+            self._multiplexer._accumulators[run] = event_accumulator.EventAccumulator(
+                os.path.join(self.logdir, run),
+                size_guidance=self._multiplexer._size_guidance,
+                tensor_size_guidance=self._multiplexer._tensor_size_guidance,
+                purge_orphaned_data=self._multiplexer.purge_orphaned_data)
+            self._multiplexer._paths[run] = os.path.join(self.logdir, run)
+ 
+    def _add_runs_matching_predicate(self, predicate):
+        runs = [r for r in self.runs if predicate(r)]
+        self.logger.log_message_info("number of runs to load: " + str(len(runs)))
+        with self.profiler.TimeBlock("adding all the runs which match the predicate"):
+            self._add_runs(runs)
 
-        def Worker():
-            """Keeps reloading accumulators til none are left."""
-            while True:
-                try:
-                    run = items_queue.get(block=False)
-                except queue.Empty:
-                    # No more runs to reload.
-                    break
-                try:
-                    self._multiplexer._accumulators[run] = event_accumulator.EventAccumulator(
-                        os.path.join(self.logdir, run),
-                        size_guidance=self._multiplexer._size_guidance,
-                        tensor_size_guidance=self._multiplexer._tensor_size_guidance,
-                        purge_orphaned_data=self._multiplexer.purge_orphaned_data)
-                    self._multiplexer._paths[run] = os.path.join(self.logdir, run)
-                finally:
-                    items_queue.task_done()
-        
-        if self.enabler_threads > 1:
-            num_threads = min(self.enabler_threads, len(runs))
-            for i in range(num_threads):
-                thread = threading.Thread(target=Worker, name='Accumulator Creator %d' % i)
-                thread.daemon = True
-                thread.start()
-            items_queue.join()
-        else:
-            Worker()
+    def _remove_runs(self, runs):
+        for run in runs:
+            if run in self._multiplexer._accumulators:
+                del self._multiplexer._accumulators[run]
+            if run in self._multiplexer._paths:
+                del self._multiplexer._paths[run]
 
-
-    def _add_runs_by_regex(self, regex):
-            runs = [r for r in self._get_runs() if re.search(regex, r)]
-            self.logger.log_message_info("number of runs to load: " + str(len(runs)))
-            with self.profiler.TimeBlock("adding all the runs which match the regex"):
-                self._add_runs(runs)
-        
-    def _remove_runs_not_matching_regex(self, regex):
+    def _remove_runs_matching_predicate(self, predicate):
         with self._multiplexer._accumulators_mutex:
-            runs = [r for r in self._get_runs() if r in self._multiplexer._accumulators and not re.search(regex, r)]
-            with self.profiler.TimeBlock("removing all the runs which do not match the regex"):
-                for run in runs:
-                    with self.profiler.TimeBlock(run):
-                        if run in self._multiplexer._accumulators:
-                            del self._multiplexer._accumulators[run]
-                        if run in self._multiplexer._paths:
-                            del self._multiplexer._paths[run]
-            
+            runs = [r for r in self.runs if predicate(r)]
+            self.logger.log_message_info("number of runs to remove: " + str(len(runs)))
+            with self.profiler.TimeBlock("removing all the runs which match predicate"):
+                self._remove_runs(runs)
+
     def _format_regex(self, regex):
         regex = regex[1:-1]
         regex = regex if regex != "(:?)" else ".*"
-        return re.compile(regex)
-     
+        print(regex)
+        try:
+            return re.compile(regex)
+        except re.error:
+            return None
+
     @wrappers.Request.application
     def enableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
         
-        self.logger.log_message_info("executing enableall_route (/enableall)")
-        with self.profiler.ProfileBlock():
-            self._add_runs_by_regex(regex)
+        if regex:
+            self.logger.log_message_info("executing enableall_route (/enableall)")
+            with self.profiler.ProfileBlock():
+                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run))
 
         return http_util.Respond(request, {}, 'application/json')
     
@@ -255,18 +228,43 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def disableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
 
-        self.logger.log_message_info("executing disableall_route (/disableall)")
-        with self.profiler.ProfileBlock():
-            self._remove_runs_by_regex(regex)
-        
+        if regex:
+            self.logger.log_message_info("executing disableall_route (/disableall)")
+            with self.profiler.ProfileBlock():
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run))
+            
         return http_util.Respond(request, {}, 'application/json')
     
     @wrappers.Request.application
     def disablenonmatching_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
         
-        self.logger.log_message_info("executing disableallnonmatching_route (/disableallnonmatching)")
-        with self.profiler.ProfileBlock():
-            self._remove_runs_not_matching_regex(regex)
-        
+        if regex:
+            self.logger.log_message_info("executing disableallnonmatching_route (/disableallnonmatching)")
+            with self.profiler.ProfileBlock():
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and not re.search(regex, run))
+            
+        return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def enableallsubstring_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        substring = request.args.get('substring')
+
+        if regex:
+            self.logger.log_message_info("executing enableallsubstring_route (/enableallsubstring)")
+            with self.profiler.ProfileBlock():
+                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run) and substring in run)
+
+        return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def disableallsubstring_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        substring = request.args.get('substring')
+        if regex:
+            self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
+            with self.profiler.ProfileBlock():
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run)
+
         return http_util.Respond(request, {}, 'application/json')

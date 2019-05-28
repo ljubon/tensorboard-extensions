@@ -29,13 +29,18 @@
           <div>
             <paper-button on-tap="enableAll">Enable all runs</paper-button>
             <paper-button on-tap="disableAll">Disable all runs</paper-button>
-            <paper-checkbox name="enable-new-runs-checkbox" checked="{{_enableNewRuns}}"></paper-checkbox>
+            <div class="checkbox-container vertical-align-container">
+              <paper-checkbox class="checkbox vertical-align-center enable-new-runs-container" name="enable-new-runs-checkbox" checked="{{_enableNewRuns}}"></paper-checkbox>
+              <div class="item-label-container">
+                  <span>Enable newly discovered runs</span>
+              </div>
+            </div>
             <div class="reload-help">Reload the dashboard to update the loaded runs</div>
           </div>
         </div>
-        <div class="horizontal">
-          <div id="outer-container" class="scrollbar">
-            <template
+        <div id="outer-container" class="scrollbar horizontal">
+          <div class="column">
+            <!-- <template
               is="dom-repeat"
               items="[[runsMatchingRegex]]" as="run">
               <div class="run-row">
@@ -51,10 +56,50 @@
                   <span>[[run]]</span>
                 </div>
               </div>
+            </template> -->
+            <template is="dom-repeat" items="[[_runGroupKeys]]" as="groupKey">
+                <div class="checkbox-container vertical-align-container group-heading">
+                  <paper-checkbox
+                    class="checkbox vertical-align-center"
+                    name="[[groupKey.runKey]]"
+                    checked="{{groupKey.checked}}"
+                    on-change="updateRunGroups"
+                  >
+                  </paper-checkbox>
+                  <div class="item-label-container">
+                      <span>run group: " [[groupKey.runKey]] "</span>
+                  </div>
+                </div>
             </template>
           </div>
-          <div class="scrollbar">
-
+          <div class="column">
+            <template is="dom-repeat" items="[[_runGroups]]" as="runGroup">
+              <div class="checkbox-container vertical-align-container group-heading">
+                <paper-checkbox
+                  class="checkbox vertical-align-center"
+                  name="[[runGroup.groupKey]]"
+                  on-change="updateSelectedRunGroup"
+                >
+                </paper-checkbox>
+                <div class="item-label-container">
+                    <span>runs matching " [[runGroup.groupKey]] "</span>
+                </div>
+              </div>
+              <template is="dom-repeat" items="[[runGroup.runs]]" as="run">
+                <div class="checkbox-container vertical-align-container run-group">
+                  <paper-checkbox
+                    class="checkbox vertical-align-center"
+                    name="[[run.run]]"
+                    checked="{{run.checked}}"
+                    on-change="_checkboxChange"
+                    >
+                  </paper-checkbox>
+                  <div class="item-label-container">
+                      <span>[[run.run]]</span>
+                  </div>
+                </div>
+              </template>
+            </template>
           </div>
         </div>  
 
@@ -68,6 +113,16 @@
         --paper-input-container-label: {
           font-size: 14px;
         };
+      }
+
+      .group-heading {
+        font-size: x-large;
+        padding: 10px;
+      }
+
+      .run-group {
+        margin-left: 50px;
+        padding: 5px;
       }
 
       .reload-help {
@@ -156,6 +211,16 @@
       .vertical-align-container .vertical-align-top {
         align-self: start;
       }
+      .column {
+        display: inline-block;
+        width: 45%;
+        vertical-align: top;
+      }
+
+      .enable-new-runs-container {
+        padding: 5px;
+      }
+
     </style>
     </template>
     <script>
@@ -190,7 +255,7 @@
               },
               _runGroups: {
                 type: Array,
-                computed: 'computeRunGroups(_runGroupObject, _runGroupKeys)',
+                value: () => [],
               },
               _runGroupKeys: {
                 type: Array,
@@ -209,7 +274,10 @@
                       return (run) => this.runSelectionState[run]
                   },
               },
-              _enableNewRuns: Boolean,
+              _enableNewRuns: {
+                type: Boolean,
+                value: false
+              },
               _debouncedRegexChange: {
                   type: Object,
                   // Updating the regex can be slow, because it involves updating styles
@@ -245,28 +313,49 @@
           listeners: {
               'dom-change': 'synchronizeColors',
           },
-          computeRunGroups(runGroupObject, runGroupKeys){
-            //TODO
+          observers:[
+            'updateRunGroups(_runGroupKeys)'
+          ],
+          updateSelectedRunGroup(){
+
+          },
+          updateRunGroups(){
+            this.set("_runGroups", this.computeRunGroups(this._runGroupKeys));
+          },
+          computeRunGroups(runGroupKeys){
+            const runGroupObject = this._runGroupObject;
+            const runGroups = runGroupKeys.filter(runGroupKey => runGroupKey.checked).map(runGroupKey => ({groupKey: runGroupKey.runKey, runs: runGroupObject[runGroupKey.runKey].sort()}));
+            console.log("printing the run groups");
+            console.log(runGroups);
+            return runGroups;
           },
           computeRunGroupKeys(runGroupObject){
-            let runGroupKeys = Object.entries(runGroupObject).map((runGroup) => ({
+            const runGroupKeys = Object.entries(runGroupObject).map((runGroup) => ({
               runKey: runGroup[0],
               checked: runGroup[1].some(run => run.checked)
             }));
+            console.log("printing the run group keys");
+            console.log(runGroupKeys);
             return runGroupKeys;
           },
           computeRunGroupObject(regex, runSelectionState){
-            let runGroupObject = Object.entries(runSelectionState).reduce((result, obj) => {
-              const key = obj[0].match(regex)[0];
-              (result[key] = result[key] || []).push({run: obj[0], checked: obj[1]});
-            }, {});
+            let runGroupObject = {}
+            for(run in runSelectionState){
+              const checked = runSelectionState[run];
+              const key = run.match(regex);
+              if(key != null){
+                if(!(key in runGroupObject)){
+                  runGroupObject[key] = [];
+                }
+                runGroupObject[key].push({run, checked});
+              }
+            }
+            console.log("printing the run group object");
+            console.log(runGroupObject)
             return runGroupObject;
           },
           disableRunsNotMatchingRegex(){
-            const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);
-            console.log("disabling the following runs")
-            console.log(runsToDisable);            
-
+            const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);      
             // Send a request to the back end to update the run state to toggle all those runs which do not match the regex  
             this._disableRunsNotMatchingRegex().then(() => {
               runsToDisable.forEach(disableRun => {
@@ -275,26 +364,17 @@
               });
             });
           },
-          _makeRegex: function(regexString) {
+          _makeRegex(regexString) {
               try {
                   return new RegExp(regexString);
               } catch (e) {
                   return null;
               }
           },
-          computeNamesMatchingRegex: function(__, ___) {
-              const regex = this._regex;
-              return regex ? this.runs.filter(run => regex.test(run)) : this.runs;
+          computeNamesMatchingRegex(runs, regex) {
+              return regex ? runs.filter(run => regex.test(run)) : runs;
           },
-          computeOutSelected: function(__, ___) {
-              var runSelectionState = this.runSelectionState;
-              var num = this.maxRunsToEnableByDefault;
-              var allEnabled = this.runsMatchingRegex.length <= num;
-              return this.runsMatchingRegex.filter(run => {
-                  return runSelectionState[run] == null ? allEnabled : runSelectionState[run];
-              });
-          },
-          synchronizeColors: function(e) {
+          synchronizeColors(e) {
               const checkboxes = this.querySelectorAll('paper-checkbox');
               checkboxes.forEach(p => {
                   const color = this.coloring.getColor(p.name);
@@ -305,7 +385,7 @@
               });
               const buttons = this.querySelectorAll('.isolator');
               buttons.forEach(p => {
-                  const color = this.coloring.getColor(p.name);
+                  const color = this.coloring.getColor(p.name); // SARAH: might be worth investigating whether this line needs to be called on every iteration - will depend on what 'this' is in the forEach context
                   p.style['color'] = color;
               });
               // The updateStyles call fails silently if the browser doesn't have focus,
@@ -315,7 +395,7 @@
                   this.updateStyles();
               });
           },
-          _checkboxChange: function(e) {
+          _checkboxChange(e) {
               var target = (Polymer.dom(e)).localTarget;
               const newSelectionState = _.clone(this.runSelectionState);
               const selectedRun = target.name;
@@ -338,7 +418,7 @@
                   this._enableRun(selectedRun);
               }
           },
-          _isChecked: function(run, outSelectedChange){
+          _isChecked(run, outSelectedChange) { 
               return this.runSelectionState[run];
           },
           enableAll(){
@@ -347,12 +427,19 @@
               allEnabledBefore = allEnabledBefore && this.runSelectionState[run];
               this.runSelectionState[run] = true;
             });
-            if(!allEnabledBefore){
-              this._enableAllRunsMatchingRegex().then(() => {
-                this.updateCheckboxesOnToggle();
-              });
+            
+            // Enable the run group structure
+            this._runGroupKeys.forEach(runkey => {
+              runkey.checked = true;
+            });
+            this.updateRunGroups();
+            
+            if(allEnabledBefore){
+              this.enableAllCheckboxes();
             }else{
-              this.updateCheckboxesOnToggle();
+              this._enableAllRunsMatchingRegex().then(() => {
+                this.enableAllCheckboxes();
+              });
             }
           },
           disableAll(){
@@ -361,18 +448,30 @@
               allDisabledBefore = allDisabledBefore && !this.runSelectionState[run];
               this.runSelectionState[run] = false;
             });
-            if(!allDisabledBefore){
-              this._disableAllRunsMatchingRegex().then(() => {
-                this.updateCheckboxesOnToggle();
-              });
+            
+            this._runGroupKeys.forEach(runkey => {
+              runkey.checked = false;
+            });
+            this.updateRunGroups();
+            
+            if(allDisabledBefore){
+              this.disableAllCheckboxes();
             }else{
-              this.updateCheckboxesOnToggle();
+              this._disableAllRunsMatchingRegex().then(() => {
+                this.disableAllCheckboxes();
+              });
             }
           },
-          updateCheckboxesOnToggle(){
-            console.log("checkboxes updated");
+          enableAllCheckboxes(){
+            console.log("all runs which match the regex have their checkbox enabled");
             this.querySelectorAll('paper-checkbox').forEach(checkbox => {
-              checkbox.checked = this.runSelectionState[checkbox.name];
+              checkbox.checked = true; 
+            });
+          },
+          disableAllCheckboxes(){
+            console.log("all runs which match the regex have their checkbox disabled");
+            this.querySelectorAll('paper-checkbox').forEach(checkbox => {
+              checkbox.checked = false; 
             });
           },
           ready() {

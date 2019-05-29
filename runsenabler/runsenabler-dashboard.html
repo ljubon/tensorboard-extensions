@@ -40,28 +40,11 @@
         </div>
         <div id="outer-container" class="scrollbar horizontal">
           <div class="column">
-            <!-- <template
-              is="dom-repeat"
-              items="[[runsMatchingRegex]]" as="run">
-              <div class="run-row">
-                <div class="icon-container checkbox-container vertical-align-container">
-                  <paper-checkbox
-                    class="checkbox vertical-align-center"
-                    name="[[run]]"
-                    checked="[[isChecked(run)]]"
-                    on-change="_checkboxChange">
-                </paper-checkbox>
-                </div>
-                <div class="item-label-container">
-                  <span>[[run]]</span>
-                </div>
-              </div>
-            </template> -->
             <template is="dom-repeat" items="[[_runGroupKeys]]" as="groupKey">
                 <div class="checkbox-container vertical-align-container group-heading">
                   <paper-checkbox
                     class="checkbox vertical-align-center"
-                    name="[[groupKey.runKey]]"
+                    name="[[groupKey.runKey]]-group"
                     checked="{{groupKey.checked}}"
                     on-change="updateRunGroups"
                   >
@@ -85,7 +68,7 @@
                     <span>runs matching " [[runGroup.groupKey]] "</span>
                 </div>
               </div>
-              <template is="dom-repeat" items="[[runGroup.runs]]" as="run">
+              <template is="dom-repeat" items="[[runGroup.runs]]" as="run" id$="[[runGroup.groupKey]]-group">
                 <div class="checkbox-container vertical-align-container run-group">
                   <paper-checkbox
                     class="checkbox vertical-align-center"
@@ -316,8 +299,34 @@
           observers:[
             'updateRunGroups(_runGroupKeys)'
           ],
-          updateSelectedRunGroup(){
+          _updateRunCheckboxesByGroup(group, isChecked){
+            // Check all checkboxes whose name match the substring and regex
+            const checkboxes = this.querySelectorAll('paper-checkbox');
+            checkboxes.forEach(checkbox => {
+              if(checkbox.name.includes(group) && checkbox.name in this.runSelectionState){
+                this.runSelectionState[checkbox.name] = isChecked;
+                checkbox.checked = isChecked;
+              }
+            });
+          },
+          updateSelectedRunGroup(event){
+            const substring = event.target.name;
+            const isChecked = event.target.checked;
 
+            // Request for the set of runs to be either enabled or disabled
+            if(isChecked){
+              // Enable all the runs in the backend
+              this._enableAllRunsMatchingRegexSubstring(substring).then(() => {
+                this._updateRunCheckboxesByGroup(substring, isChecked);
+              });
+            }else{
+              // Disable all the runs in the backend
+              this._disableAllRunsMatchingRegexSubstring(substring).then(() => {
+                this._updateRunCheckboxesByGroup(substring, isChecked);
+              });
+            }
+
+            console.log(`group ${substring} set to ${isChecked}`);
           },
           updateRunGroups(){
             this.set("_runGroups", this.computeRunGroups(this._runGroupKeys));
@@ -520,7 +529,15 @@
           _disableRunsNotMatchingRegex(){
             const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablenonmatching', new URLSearchParams({regex: this._regex}));
             return this._requestManager.request(url);
-          }
+          },
+          _enableAllRunsMatchingRegexSubstring(substring){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableallsubstring', new URLSearchParams({regex: this._regex, substring}));
+            return this._requestManager.request(url);
+          },
+          _disableAllRunsMatchingRegexSubstring(substring){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({regex: this._regex, substring}));
+            return this._requestManager.request(url);
+          },
         });
         tf_tensorboard.registerDashboard({
             plugin: 'runsenabler',

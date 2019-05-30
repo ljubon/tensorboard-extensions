@@ -21,14 +21,21 @@
             <paper-input
               id="runs-regex"
               no-label-float
-              label="Write a regex to filter runs"
+              label="Write a regex to filter all runs into groups"
               value="[[regex]]"
               on-bind-value-changed="_debouncedRegexChange">
             </paper-input>
           </div>
           <div>
-            <paper-button on-tap="enableAll">Enable all runs</paper-button>
-            <paper-button on-tap="disableAll">Disable all runs</paper-button>
+            <paper-input
+              id="displayed-runs-regex"
+              no-label-float
+              label="Write a regex to filter runs which are displayed"
+              value="[[regex]]"
+              on-bind-value-changed="_debouncedGroupRunsRegexChange">
+            </paper-input>
+          </div>
+          <div>
             <div class="checkbox-container vertical-align-container">
               <paper-checkbox class="checkbox vertical-align-center enable-new-runs-container" name="enable-new-runs-checkbox" checked="{{_enableNewRuns}}"></paper-checkbox>
               <div class="item-label-container">
@@ -40,13 +47,15 @@
         </div>
         <div id="outer-container" class="scrollbar horizontal">
           <div class="column">
+            <paper-button on-tap="enableAll" raised>Enable all groups</paper-button>
+            <paper-button on-tap="disableAll" raised>Disable all groups</paper-button>
             <template is="dom-repeat" items="[[_runGroupKeys]]" as="groupKey">
                 <div class="checkbox-container vertical-align-container group-heading">
                   <paper-checkbox
                     class="checkbox vertical-align-center"
-                    name="[[groupKey.runKey]]-group"
+                    name="[[groupKey.runKey]]"
                     checked="{{groupKey.checked}}"
-                    on-change="updateRunGroups"
+                    on-change="toggleRunsInGroup"
                   >
                   </paper-checkbox>
                   <div class="item-label-container">
@@ -56,17 +65,11 @@
             </template>
           </div>
           <div class="column">
+            <paper-button on-tap="enableAllDisplayedRuns" raised>Enable all displayed runs</paper-button>
+            <paper-button on-tap="disableAllDisplayedRuns" raised>Disable all displayed runs</paper-button>
             <template is="dom-repeat" items="[[_runGroups]]" as="runGroup">
-              <div class="checkbox-container vertical-align-container group-heading">
-                <paper-checkbox
-                  class="checkbox vertical-align-center"
-                  name="[[runGroup.groupKey]]"
-                  on-change="updateSelectedRunGroup"
-                >
-                </paper-checkbox>
-                <div class="item-label-container">
-                    <span>runs matching " [[runGroup.groupKey]] "</span>
-                </div>
+              <div class="group-heading">
+                  <span>runs matching " [[runGroup.groupKey]] "</span>
               </div>
               <template is="dom-repeat" items="[[runGroup.runs]]" as="run" id$="[[runGroup.groupKey]]-group">
                 <div class="checkbox-container vertical-align-container run-group">
@@ -99,7 +102,6 @@
       }
 
       .group-heading {
-        font-size: x-large;
         padding: 10px;
       }
 
@@ -222,6 +224,19 @@
                       getColor: () => '',
                   },
               },
+              displayedRuns: {
+                type: Array,
+                computed: 'computeDisplayedRuns(_runGroups)'
+              },
+              displayedRunsRegex: {
+                type: String, 
+                notify: true,
+                value: '',
+              },
+              _displayedRunsRegex: {
+                type: Object, 
+                computed: '_makeRegex(displayedRunsRegex)'
+              },
               regex: {
                   type: String,
                   notify: true,
@@ -232,6 +247,10 @@
                   type: Array,
                   computed: 'computeNamesMatchingRegex(runs, _regex)'
               },  // Runs that match the regex
+              runsNotMatchingRegex: {
+                type: Array,
+                computed: 'computeNamesNotMatchingRegex(runs, _regex)'
+              },
               _runGroupObject: {
                 type: Object,
                 computed: 'computeRunGroupObject(_regex, runSelectionState)',
@@ -286,6 +305,30 @@
                       };
                   },
               },
+              _debouncedGroupRunsRegexChange: {
+                type: Object,
+                // Updating the regex can be slow, because it involves updating styles
+                // on a large number of Polymer paper-checkboxes. We don't want to do
+                // this while the user is typing, as it may make a bad, laggy UI.
+                // So we debounce the updates that come from user typing.
+                value: function() {
+                  var debounced = _.debounce(r => {
+                      this.displayedRunsRegex = r;
+                  }, 150, {leading: false});
+                  return function() {
+                      var r = this.$$('#displayed-runs-regex').value;
+                      if (r == '') {
+                          // If the user cleared the field, they may be done typing, so
+                          // update more quickly.
+                          this.async(() => {
+                              this.displayedRunsRegex = r;
+                          }, 30);
+                      } else {
+                          debounced(r);
+                      };
+                  };
+                },
+              },
               maxNamesToEnableByDefault: {
                   // When TB first loads, if it has k or fewer names, they are all enabled
                   // by default. If there are more, then they are all disabled.
@@ -297,8 +340,31 @@
               'dom-change': 'synchronizeColors',
           },
           observers:[
-            'updateRunGroups(_runGroupKeys)'
+            'updateRunGroups(_runGroupKeys, _displayedRunsRegex)'
           ],
+          computeDisplayedRuns(runGroups){
+            return [].concat.apply(runGroups.map(runGroup => runGroup.runs)).map(run => run.run);
+          },
+          enableAllDisplayedRuns(){
+            const keys = this._runGroups.map(runGroup => runGroup.groupKey);
+            for(let key in keys){
+              this._updateRunCheckboxesByGroup(key, true);
+              this._enableAllRunsMatchingRegexSubstring(key);
+            }
+          }, 
+          disableAllDisplayedRuns(){
+            const keys = this._runGroups.map(runGroup => runGroup.groupKey);
+            for(let key in keys){
+              this._updateRunCheckboxesByGroup(key, false);
+              this._disableAllRunsMatchingRegexSubstring(key);
+            }
+          }, 
+          toggleRunsInGroup(event){
+            // Compute the set of groups which will be displayed in the dashboard 
+            this.updateRunGroups();
+            // Update the run group which has been toggled so that either all the runs are enabled or all of them are disabled (in which case it will not be shown)
+            this.updateSelectedRunGroup(event);
+          },
           _updateRunCheckboxesByGroup(group, isChecked){
             // Check all checkboxes whose name match the substring and regex
             const checkboxes = this.querySelectorAll('paper-checkbox');
@@ -329,9 +395,25 @@
             console.log(`group ${substring} set to ${isChecked}`);
           },
           updateRunGroups(){
-            this.set("_runGroups", this.computeRunGroups(this._runGroupKeys));
+            // Compute the run groups (without the filtering)
+            const runGroups = this.computeRunGroups(this._runGroupKeys, this._displayedRunsRegex);
+            // Compute the runs to disable
+            const runsToDisable = [].concat.apply(runGroups.map(runGroup => runGroup.runs.map(run => run.run).filter(run => !this._displayedRunsRegex.test(run))))
+            // Disable all the runs in the selection state
+            runsToDisable.forEach(run => {
+              this.runSelectionState[run] = false;
+            });
+            // Send request to backend to disable the displayed runs which do not match the regex (which will not be displayed anymore)
+            if(runsToDisable && runsToDisable.length > 0){
+              runGroups.forEach(runGroup => {
+                const substring = runGroup.runKey;
+                this._disableAllRunsNotMatchingRegexSubstring(substring);
+              });
+            }
+            // Update the run groups
+            this.set("_runGroups", runGroups.map(runGroup => ({groupKey: runGroup.runKey, runs: runGroup.runs.filter(run => this._displayedRunsRegex.test(run.run))})));
           },
-          computeRunGroups(runGroupKeys){
+          computeRunGroups(runGroupKeys, runRegex){
             const runGroupObject = this._runGroupObject;
             const runGroups = runGroupKeys.filter(runGroupKey => runGroupKey.checked).map(runGroupKey => ({groupKey: runGroupKey.runKey, runs: runGroupObject[runGroupKey.runKey].sort()}));
             console.log("printing the run groups");
@@ -364,7 +446,7 @@
             return runGroupObject;
           },
           disableRunsNotMatchingRegex(){
-            const runsToDisable = this.runs.filter(r => !this.runsMatchingRegex.includes(r) && this.runSelectionState[r]);      
+            const runsToDisable = this.runsNotMatchingRegex.filter(r => this.runSelectionState[r]);      
             // Send a request to the back end to update the run state to toggle all those runs which do not match the regex  
             this._disableRunsNotMatchingRegex().then(() => {
               runsToDisable.forEach(disableRun => {
@@ -379,6 +461,9 @@
               } catch (e) {
                   return null;
               }
+          },
+          computeNamesNotMatchingRegex(runs, regex) {
+            return regex ? runs.filter(run => !regex.test(run)) : [];
           },
           computeNamesMatchingRegex(runs, regex) {
               return regex ? runs.filter(run => regex.test(run)) : runs;
@@ -531,11 +616,15 @@
             return this._requestManager.request(url);
           },
           _enableAllRunsMatchingRegexSubstring(substring){
-            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableallsubstring', new URLSearchParams({regex: this._regex, substring}));
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableallsubstring', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
           },
           _disableAllRunsMatchingRegexSubstring(substring){
-            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({regex: this._regex, substring}));
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
+            return this._requestManager.request(url);
+          },
+          _disableAllRunsNotMatchingRegexSubstring(substring){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstringnonmatching', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
           },
         });

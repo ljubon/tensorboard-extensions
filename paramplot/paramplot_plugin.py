@@ -41,7 +41,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         self._context = context
 
         self._parameter_config = {}
-        self.parameters = []
+        self.parameters = [] # Sam - change to set()
         self.printer = pprint.PrettyPrinter(indent=4)
 
     def _compute_config(self):
@@ -56,7 +56,8 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         # backfill any parameters which are missing with default values
         parameter_keys = list(
             map(lambda x: x.keys(), self._parameter_config.values()))
-        self.parameters = set()
+        self.parameters = set() #Sam - move to __init__
+        #Sam possibly self.parameters = set.union(*parameter_keys)
         for parameter_list in parameter_keys:
             self.parameters.update(parameter_list)
 
@@ -125,7 +126,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
     def aggregate_tensor_events(self, tensor_events, aggregation):
         event_list = [tf.make_ndarray(event.tensor_proto).item() for event in tensor_events]
-        events_ndarray = np.array(event_list)
+        events_ndarray = np.array(event_list) # Sam - could just wrap above list comp in np.array
         
         if aggregation == ParamPlotPlugin.MIN:
             return np.amin(events_ndarray)
@@ -176,10 +177,13 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run][parameter]
-            param_key = ""
-            for p in excluded_parameters: 
-                param_key = param_key+("["+p+"-"+str(self._parameter_config[run][p])+"]")
+            # Sam - could be replaced with
+            param_key = "".join([f"[{p}-{self._parameter_config[run][p]}]" for p in excluded_parameters])
+            # param_key = ""
+            # for p in excluded_parameters: 
+            #     param_key = param_key+("["+p+"-"+str(self._parameter_config[run][p])+"]")
             
+            # Sam - defaultdict
             if param_key in processed_events:
                 processed_events[param_key].append((param_value, self.aggregate_tensor_events(tensor_events, aggregation)))
             else:
@@ -194,6 +198,7 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run][parameter]
             
+            # Sam - use defaultdict 
             if param_value in processed_events: 
                 processed_events[param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
             else:

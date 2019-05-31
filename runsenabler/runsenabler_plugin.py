@@ -69,6 +69,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/disablenonmatching': self.disablenonmatching_route,
             '/enableallsubstring': self.enableallsubstring_route,
             '/disableallsubstring': self.disableallsubstring_route,
+            '/disableallsubstringnonmatching': self.disableallsubstringnonmatching_route
         }
 
     def is_active(self):
@@ -139,7 +140,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         new_run_set = set(run_path_names)
         newly_added_runs = new_run_set.difference(old_run_set)
         
-        # Update the runs which are currently being 
+        # Update the run state to reflect runs which have accumulators and also ones which have been newly added
         new_run_state = {run: (run in self._multiplexer._accumulators or (enable_new_runs and run in newly_added_runs)) for run in run_path_names}
         self.runs = run_path_names
         
@@ -167,7 +168,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
                 self.run_state, new_runs = self._get_runstate(enable_new_runs)
                 # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
                 # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
-                if enable_new_runs and len(new_runs) > 0:
+                if enable_new_runs:
                     self._add_runs(new_runs)
             with self.profiler.TimeBlock("_multiplexer.Reload()"):
                 self._multiplexer.Reload()
@@ -215,8 +216,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     @wrappers.Request.application
     def enableall_route(self, request):
-        regex = self._format_regex(request.args.get('regex'))
-        
+        regex = self._format_regex(request.args.get('regex'))    
         if regex:
             self.logger.log_message_info("executing enableall_route (/enableall)")
             with self.profiler.ProfileBlock():
@@ -227,7 +227,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     @wrappers.Request.application
     def disableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
-
         if regex:
             self.logger.log_message_info("executing disableall_route (/disableall)")
             with self.profiler.ProfileBlock():
@@ -238,7 +237,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     @wrappers.Request.application
     def disablenonmatching_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
-        
         if regex:
             self.logger.log_message_info("executing disableallnonmatching_route (/disableallnonmatching)")
             with self.profiler.ProfileBlock():
@@ -249,22 +247,35 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     @wrappers.Request.application
     def enableallsubstring_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
+        subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
-
-        if regex:
+        if regex and subregex:
             self.logger.log_message_info("executing enableallsubstring_route (/enableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run) and substring in run)
+                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run) and substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
     
     @wrappers.Request.application
     def disableallsubstring_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
+        subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
-        if regex:
+        if regex and subregex:
             self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run)
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run and re.search(subregex, run))
+
+        return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def disableallsubstringnonmatching_route(self, request):
+        regex = self._format_regex(request.args.get('regex'))
+        subregex = self._format_regex(request.args.get('subregex'))
+        substring = request.args.get('substring')
+        if regex and subregex:
+            self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
+            with self.profiler.ProfileBlock():
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run and not re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')

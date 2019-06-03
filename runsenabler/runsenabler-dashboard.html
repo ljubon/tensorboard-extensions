@@ -179,6 +179,7 @@
         padding-left: 2px;
       }
       .item-label-container {
+        font-size: small;
         padding-left: 5px;
         flex-grow: 1;
         flex-shrink: 1;
@@ -202,7 +203,7 @@
       .vertical-align-container .vertical-align-top {
         align-self: start;
       }
-      
+
       .column {
         display: inline-block;
         width: 49%;
@@ -400,20 +401,6 @@
           updateRunGroups(){
             // Compute the run groups (without the filtering)
             const runGroups = this.computeRunGroups(this._runGroupKeys, this._displayedRunsRegex);
-            // Compute the runs to disable
-            const runsToDisable = runGroups.map(runGroup => runGroup.runs.map(run => run.run).filter(run => !this._displayedRunsRegex.test(run))).flat();
-            // let runsToDisable = runGroups.map()
-            // Disable all the runs in the selection state
-            runsToDisable.forEach(run => {
-              this.runSelectionState[run] = false;
-            });
-            // Send request to backend to disable the displayed runs which do not match the regex (which will not be displayed anymore)
-            if(runsToDisable && runsToDisable.length > 0){
-              runGroups.forEach(runGroup => {
-                const substring = runGroup.groupKey;
-                this._disableAllRunsNotMatchingRegexSubstring(substring);
-              });
-            }
             // Update the run groups
             this.set("_runGroups", runGroups.map(runGroup => ({
                                                                 groupKey: runGroup.groupKey, 
@@ -473,16 +460,14 @@
           },
           _checkboxChange(e) {
               var target = (Polymer.dom(e)).localTarget;
-              const newSelectionState = _.clone(this.runSelectionState);
               const selectedRun = target.name;
 
               // Determine whether the checkbox was enabled or disabled
-              const beforeState = newSelectionState[selectedRun];
+              const beforeState = this.runSelectionState[selectedRun];
               const afterState = target.checked;
 
-              newSelectionState[selectedRun] = target.checked;
               // n.b. notifyPath won't work because names may have periods.
-              this.runSelectionState = newSelectionState;
+              this.runSelectionState[selectedRun] = target.checked;
 
               // Send a request to enable / disable the run in the runsenabler backend
               if(beforeState && !afterState){
@@ -601,10 +586,6 @@
           },
           _disableAllRunsMatchingRegexSubstring(substring){
             const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
-            return this._requestManager.request(url);
-          },
-          _disableAllRunsNotMatchingRegexSubstring(substring){
-            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstringnonmatching', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
           },
         });

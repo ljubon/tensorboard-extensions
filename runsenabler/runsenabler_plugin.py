@@ -69,7 +69,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/disablenonmatching': self.disablenonmatching_route,
             '/enableallsubstring': self.enableallsubstring_route,
             '/disableallsubstring': self.disableallsubstring_route,
-            '/disableallsubstringnonmatching': self.disableallsubstringnonmatching_route
         }
 
     def is_active(self):
@@ -162,16 +161,15 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         enable_new_runs = request.args.get('enableNewRuns')
 
         self.logger.log_message_info("executing runstate_route (/runs)")
-        with self.profiler.ProfileBlock():
-            with self.profiler.TimeBlock("_get_runstate()"):
-                # Handles the case where new runs are added after tensorboard has begun 
-                self.run_state, new_runs = self._get_runstate(enable_new_runs)
-                # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
-                # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
-                if enable_new_runs:
-                    self._add_runs(new_runs)
-            with self.profiler.TimeBlock("_multiplexer.Reload()"):
-                self._multiplexer.Reload()
+        with self.profiler.ProfileBlock(), self.profiler.TimeBlock("_get_runstate()"):
+            # Handles the case where new runs are added after tensorboard has begun 
+            self.run_state, new_runs = self._get_runstate(enable_new_runs)
+            # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
+            # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
+            if enable_new_runs:
+                self._add_runs(new_runs)
+        with self.profiler.TimeBlock("_multiplexer.Reload()"):
+            self._multiplexer.Reload()
 
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
@@ -265,17 +263,5 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
             with self.profiler.ProfileBlock():
                 self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run and re.search(subregex, run))
-
-        return http_util.Respond(request, {}, 'application/json')
-    
-    @wrappers.Request.application
-    def disableallsubstringnonmatching_route(self, request):
-        regex = self._format_regex(request.args.get('regex'))
-        subregex = self._format_regex(request.args.get('subregex'))
-        substring = request.args.get('substring')
-        if regex and subregex:
-            self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
-            with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run and not re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')

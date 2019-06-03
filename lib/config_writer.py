@@ -14,6 +14,13 @@ class ParamPlotConfigWriter:
     
     def AddParameter(self, name, value):
       self.config_dict[name] = value
+    
+    def AddParametersByDict(self, param_map):
+      for name in param_map:
+        self.config_dict[name] = param_map[name]
+    
+    def SetParameters(self, param_map):
+      self.config_dict = param_map
 
     def Save(self):
       # create the run parameters file and save the config dictionary

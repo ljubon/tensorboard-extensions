@@ -160,8 +160,8 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
 
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
-            param_value = self._parameter_config[run][parameter]
-            param_key = "".join([f"[{p}-{self._parameter_config[run][p]}]" for p in excluded_parameters])
+            param_value = self._parameter_config[run].get(parameter, np.nan)
+            param_key = "".join([f"[{p}: {self._parameter_config[run].get(p, np.nan)}]" for p in excluded_parameters])
             processed_events[param_key].append((param_value, self.aggregate_tensor_events(tensor_events, aggregation)))
         
         return processed_events
@@ -170,8 +170,8 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         processed_events = collections.defaultdict(list)
         
         for run in self._get_valid_runs():
-            tensor_events = self._multiresponseplexer.Tensors(run, tag)
-            param_value = self._parameter_config[run][parameter]
+            tensor_events = self._multiplexer.Tensors(run, tag)
+            param_value = self._parameter_config[run].get(parameter, np.nan)
             processed_events[param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
         
         return {"All": [(param_value, np.nanmean(np.array(tensors))) for param_value, tensors in processed_events.items()]}
@@ -212,7 +212,5 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         response = {
             "payload": list(self.parameters)
         }
-
-        self.printer.pprint(response)
 
         return http_util.Respond(request, response, 'application/json')

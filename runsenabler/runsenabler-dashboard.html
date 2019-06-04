@@ -268,8 +268,6 @@
                 computed: 'computeRunGroupKeys(_runGroupObject)',
               },
               runSelectionState: {
-                  // if a name is explicitly enabled, True, if explicitly disabled, False.
-                  // if undefined, default value (enable for first k names, disable after).
                   type: Object,
                   notify: true,
                   value: () => ({}),
@@ -534,7 +532,9 @@
             });
           },
           ready() {
-              this.reload();
+              this._fetchDefaultRegex().then(() => {
+                this.reload();
+              });
           },
           reload() {
               this._fetchRuns();
@@ -555,6 +555,15 @@
                   this.set('runs', newRuns.sort());
                   this.logEnabledRuns();
               });
+          },
+          _fetchDefaultRegex(){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/defaultregex');
+            return this._requestManager.request(url).then(regex => {
+              if(_.isEqual(this.regex, regex.regex)){
+                return;
+              }
+              this.set('regex', regex.regex);
+            });
           },
           _enableRun(run){
             const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablerun', new URLSearchParams({

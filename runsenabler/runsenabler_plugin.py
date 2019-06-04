@@ -44,7 +44,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._context = context
         self.logdir = context.logdir
         self.printer = pprint.PrettyPrinter(indent=4)
-        self.enabler_threads = context.flags.runsenabler_threads
+        self.default_runs_regex = context.flags.default_runs_regex
 
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
         # and register all the plugins with gr tensorboard
@@ -69,6 +69,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/disablenonmatching': self.disablenonmatching_route,
             '/enableallsubstring': self.enableallsubstring_route,
             '/disableallsubstring': self.disableallsubstring_route,
+            '/defaultregex': self.defaultregex_route,
         }
 
     def is_active(self):
@@ -85,6 +86,10 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     def _enable_run(self, run):
         run_path = os.path.join(self.logdir, run)
         self._multiplexer.AddRun(run_path, run)
+
+    @wrappers.Request.application
+    def defaultregex_route(self, request):
+        return http_util.Respond(request, {"regex": self.default_runs_regex}, "application/json")
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -170,7 +175,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
                 self._add_runs(new_runs)
         with self.profiler.TimeBlock("_multiplexer.Reload()"):
             self._multiplexer.Reload()
-
+        
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
 
@@ -205,8 +210,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     def _format_regex(self, regex):
         regex = regex[1:-1]
-        regex = regex if regex != "(:?)" else ".*"
-        print(regex)
+        regex = regex if regex != "(?:)" else ".*"
         try:
             return re.compile(regex)
         except re.error:

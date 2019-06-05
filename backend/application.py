@@ -2,11 +2,11 @@ import os
 
 from tensorboard.plugins import base_plugin
 from tensorboard.backend.event_processing import plugin_event_accumulator
-from tensorboard.backend.event_processing import io_wrapper
 from tensorboard.backend import application
 from tensorboard.backend.event_processing import plugin_event_multiplexer
 
 from .logging import _logger
+import io_helpers
 
 def gr_tensorboard_wsgi(flags, plugin_loaders, assets_zip_provider):
     size_guidance = {plugin_event_accumulator.TENSORS: 50}
@@ -41,9 +41,8 @@ def _getRunPathMapFromLogdir(logdir, most_recent_num):
     if most_recent_num == 0:
         return {}
     elif most_recent_num > 0:
-        dir_list = sorted(list(io_wrapper.GetLogdirSubdirectories(logdir)), key=os.path.getmtime)
+        dir_list = sorted(io_helpers.get_run_paths(logdir), key=os.path.getmtime)
         num_files = min(most_recent_num, len(dir_list))
         return {os.path.relpath(path, logdir): path for path in dir_list[-num_files:]}
     else:
-        dir_list = list(io_wrapper.GetLogdirSubdirectories(logdir))
-        return {os.path.relpath(path, logdir): path for path in dir_list}
+        return {os.path.relpath(path, logdir): path for path in io_helpers.get_run_paths(logdir)}

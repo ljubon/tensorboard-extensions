@@ -15,7 +15,6 @@ import collections
 from tensorboard.backend import http_util
 from tensorboard.backend.event_processing import event_multiplexer
 from tensorboard.plugins import base_plugin
-from tensorboard.backend.event_processing import io_wrapper
 
 
 class ParamPlotPlugin(base_plugin.TBPlugin):
@@ -56,8 +55,9 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
                     self._parameter_config[run_name] = json.loads(config_file_handle.read())
 
         # Calculate the list of parameters which have values
-        parameter_keys = list(map(lambda x: set(x.keys()), self._parameter_config.values()))
-        self.parameters = set.union(*parameter_keys)
+        parameter_keys = [set(x.keys()) for x in self._parameter_config.values()]
+        if parameter_keys:
+            self.parameters = set.union(*parameter_keys)
 
     def _get_valid_runs(self):
         return [run for run in self._multiplexer.Runs() if run in self._parameter_config]

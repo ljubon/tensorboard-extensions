@@ -13,6 +13,7 @@ py_library(
         "@org_tensorflow_tensorboard//tensorboard/backend:application",
         "@org_tensorflow_tensorboard//tensorboard/backend/event_processing:io_wrapper",
         "@org_tensorflow_tensorboard//tensorboard/backend/event_processing:event_accumulator",
+        ":io_helpers"
     ],
 )
 
@@ -29,4 +30,10 @@ py_library(
         "@org_pythonhosted_six",
         ":logging",
     ],
+)
+
+py_library(
+    name = "io_helpers",
+    srcs = ["io_helpers.py"],
+    visibility = ["//visibility:public"],
 )

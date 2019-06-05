@@ -16,19 +16,13 @@ from collections import deque
 
 from tensorboard.backend import http_util
 from tensorboard.plugins import base_plugin
-from tensorboard.backend.event_processing import io_wrapper
 from tensorboard.backend.event_processing import plugin_event_accumulator as event_accumulator
 
+from gr_tensorboard.backend import io_helpers
 from .runsenabler_profiler import RunsEnablerLogger, RunsEnablerProfiler, NoOpLogger, NoOpProfiler
 
 class RunsEnablerPlugin(base_plugin.TBPlugin):
     """A plugin that controls which runs tensorboard can inspect"""
-
-    # This static property will also be included within routes (URL paths)
-    # offered by this plugin. This property must uniquely identify this plugin
-    # from all other plugins.
-    plugin_name = 'runsenabler'
-    MIN_DEFAULT = 10
 
     def __init__(self, context):
         """Instantiates a RunsEnablerPlugin.
@@ -133,7 +127,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         return http_util.Respond(request, {}, 'application/json')
 
     def _get_runs(self):
-        return list(map(lambda x: os.path.relpath(x, self.logdir), io_wrapper.GetLogdirSubdirectories(self.logdir)))
+        return io_helpers.get_run_names(self.logdir)
+
 
     def _get_runstate(self, enable_new_runs=False):
         # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
@@ -254,7 +249,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         if regex and subregex:
             self.logger.log_message_info("executing enableallsubstring_route (/enableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run) and substring in run and re.search(subregex, run))
+                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
     
@@ -266,6 +261,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         if regex and subregex:
             self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run) and substring in run and re.search(subregex, run))
+                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')

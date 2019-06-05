@@ -24,6 +24,11 @@ from .runsenabler_profiler import RunsEnablerLogger, RunsEnablerProfiler, NoOpLo
 class RunsEnablerPlugin(base_plugin.TBPlugin):
     """A plugin that controls which runs tensorboard can inspect"""
 
+    # This static property will also be included within routes (URL paths)
+    # offered by this plugin. This property must uniquely identify this plugin
+    # from all other plugins.
+    plugin_name = 'runsenabler'
+
     def __init__(self, context):
         """Instantiates a RunsEnablerPlugin.
 
@@ -243,10 +248,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     
     @wrappers.Request.application
     def enableallsubstring_route(self, request):
-        regex = self._format_regex(request.args.get('regex'))
         subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
-        if regex and subregex:
+        if subregex:
             self.logger.log_message_info("executing enableallsubstring_route (/enableallsubstring)")
             with self.profiler.ProfileBlock():
                 self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
@@ -255,10 +259,9 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     
     @wrappers.Request.application
     def disableallsubstring_route(self, request):
-        regex = self._format_regex(request.args.get('regex'))
         subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
-        if regex and subregex:
+        if subregex:
             self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
             with self.profiler.ProfileBlock():
                 self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))

@@ -590,11 +590,11 @@
             return this._requestManager.request(url);
           },
           _enableAllRunsMatchingRegexSubstring(substring){
-            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableallsubstring', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enableallsubstring', new URLSearchParams({substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
           },
           _disableAllRunsMatchingRegexSubstring(substring){
-            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({regex: this._regex, substring, subregex: this._displayedRunsRegex}));
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
           },
         });

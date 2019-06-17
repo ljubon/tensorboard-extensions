@@ -174,7 +174,7 @@
             const formattedData = data[series_key].map(seriesValues => {
               const datum = seriesValues;
               return {
-                wall_time: new Date((++counter)*1000),
+                wall_time: new Date((++counter)*1000), // SARAH:Have a quick google and see if thi is recommended in JS
                 step: datum[0],
                 scalar: datum[1],
               }

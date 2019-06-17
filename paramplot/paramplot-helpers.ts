@@ -3,12 +3,7 @@ namespace gr_paramplot_dashboard {
     const formatValueOrNaN = (x) => isNaN(x) ? 'NaN' : vz_chart_helpers.multiscaleFormatter(vz_chart_helpers.Y_TOOLTIP_FORMATTER_PRECISION)(x);
 
     export class DataSeries {
-        private name: string;
-        private scalarData: vz_chart_helpers.ScalarDatum[];
-
-        constructor(name: string, scalarData: vz_chart_helpers.ScalarDatum[]) {
-            this.name = name;
-            this.scalarData = scalarData;
+        constructor(private name: string, private scalarData: vz_chart_helpers.ScalarDatum[]) {
         }
 
         getName(): string {

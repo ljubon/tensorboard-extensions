@@ -68,6 +68,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             '/disablenonmatching': self.disablenonmatching_route,
             '/enableallsubstring': self.enableallsubstring_route,
             '/disableallsubstring': self.disableallsubstring_route,
+            '/disablealldisplayedgroups': self.disablealldisplayedgroups_route,
+            '/enablealldisplayedgroups': self.enablealldisplayedgroups_route,
             '/defaultregex': self.defaultregex_route,
         }
 
@@ -267,3 +269,28 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
                 self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
+    
+    @wrappers.Request.application
+    def disablealldisplayedgroups_route(self, request):
+        subregex = self._format_regex(request.args.get('subregex'))
+        substrings = json.loads(request.form.get("groups"))
+        if subregex:
+            self.logger.log_message_info("executing disablealldisplayedgroups_route (/disablealldisplayedgroups)")
+            with self.profiler.ProfileBlock():
+                for substring in substrings:
+                    self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
+        
+        return http_util.Respond(request, {}, 'application/json')
+
+    @wrappers.Request.application
+    def enablealldisplayedgroups_route(self, request):
+        subregex = self._format_regex(request.args.get('subregex'))
+        substrings = json.loads(request.form.get("groups"))
+        if subregex:
+            self.logger.log_message_info("executing enablealldisplayedgroups_route (/enablealldisplayedgroups)")
+            with self.profiler.ProfileBlock():
+                for substring in substrings:
+                    self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
+
+        return http_util.Respond(request, {}, 'application/json')
+    

@@ -331,12 +331,6 @@
                   };
                 },
               },
-              maxNamesToEnableByDefault: {
-                  // When TB first loads, if it has k or fewer names, they are all enabled
-                  // by default. If there are more, then they are all disabled.
-                  type: Number,
-                  value: 40,
-              },
           },
           observers:[
             'updateRunGroups(_runGroupKeys, _displayedRunsRegex)'
@@ -347,19 +341,21 @@
           },
           enableAllDisplayedRuns(){
             const keys = this._runGroups.map(runGroup => runGroup.groupKey);
-            keys.forEach(key => {
-              this._updateRunCheckboxesByGroup(key, true);
-              this._enableAllRunsMatchingRegexSubstring(key);
+            this._enableAllRunsMatchingMultipleSubsting(keys).then(() => {
+              keys.forEach(key => {
+                this._updateRunCheckboxesByGroup(key, true);
+              });
+              this.logEnabledRuns();
             });
-            this.logEnabledRuns();
           }, 
           disableAllDisplayedRuns(){
             const keys = this._runGroups.map(runGroup => runGroup.groupKey);
-            keys.forEach(key => {
-              this._updateRunCheckboxesByGroup(key, false);
-              this._disableAllRunsMatchingRegexSubstring(key);
+            this._disableAllRunsMatchingMultipleSubsting(keys).then(() => {
+              keys.forEach(key => {
+                this._updateRunCheckboxesByGroup(key, false);
+              });
+              this.logEnabledRuns();
             });
-            this.logEnabledRuns();
           }, 
           toggleRunsInGroup(event){
             // Compute the set of groups which will be displayed in the dashboard 
@@ -596,6 +592,14 @@
           _disableAllRunsMatchingRegexSubstring(substring){
             const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disableallsubstring', new URLSearchParams({substring, subregex: this._displayedRunsRegex}));
             return this._requestManager.request(url);
+          },
+          _enableAllRunsMatchingMultipleSubsting(substrings){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/enablealldisplayedgroups', new URLSearchParams({subregex: this._displayedRunsRegex}));
+            return this._requestManager.request(url, {"groups": JSON.stringify(substrings)});
+          },
+          _disableAllRunsMatchingMultipleSubsting(substrings){
+            const url = tf_backend.getRouter().pluginRoute('runsenabler', '/disablealldisplayedgroups', new URLSearchParams({subregex: this._displayedRunsRegex}));
+            return this._requestManager.request(url, {"groups": JSON.stringify(substrings)});
           },
         });
         tf_tensorboard.registerDashboard({

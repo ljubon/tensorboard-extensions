@@ -12,6 +12,14 @@ py_library(
 )
 
 py_library(
+    name = "runsenabler_controller",
+    srcs = ["runsenabler_controller.py"],
+    deps = [
+        "@org_tensorflow_tensorboard//tensorboard/backend/event_processing:event_accumulator"
+    ],
+)
+
+py_library(
     name = "runsenabler_plugin",
     srcs = ["runsenabler_plugin.py", "runsenabler_profiler.py"],
     deps = [
@@ -20,7 +28,8 @@ py_library(
         "@org_tensorflow_tensorboard//tensorboard/backend:http_util",
         "@org_tensorflow_tensorboard//tensorboard/backend/event_processing:event_accumulator",
         "@org_tensorflow_tensorboard//tensorboard/plugins:base_plugin",
-        "//backend:io_helpers"
+        "//backend:io_helpers",
+        ":runsenabler_controller",
     ],
 )
 

@@ -11,6 +11,9 @@ import queue
 import threading
 import concurrent.futures
 
+import shutil
+import pathlib
+
 from werkzeug import wrappers
 from collections import deque
 
@@ -29,7 +32,7 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
     # from all other plugins.
     plugin_name = 'runsenabler'
 
-    def __init__(self, context):
+    def __init__(self, context, controller):
         """Instantiates a RunsEnablerPlugin.
 
         Args:
@@ -41,10 +44,10 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self._multiplexer = context.multiplexer
         self._accumulator_cache = {}
         self._context = context
-        self.logdir = context.logdir
+        self.temp_logdir = context.logdir
         self.printer = pprint.PrettyPrinter(indent=4)
         self.default_runs_regex = context.flags.default_runs_regex
-
+        self.controller = controller
         # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
         # and register all the plugins with gr tensorboard
         self._multiplexer.Reload()
@@ -83,10 +86,6 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         """
 
         return True
-    
-    def _enable_run(self, run):
-        run_path = os.path.join(self.logdir, run)
-        self._multiplexer.AddRun(run_path, run)
 
     @wrappers.Request.application
     def defaultregex_route(self, request):
@@ -107,13 +106,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self._enable_run(run)
+        self.controller.enable_run(run)
         return http_util.Respond(request, {}, 'application/json')
-    
-    def _disable_run(self, run):
-        with self._multiplexer._accumulators_mutex:
-            if run in self._multiplexer._accumulators:
-                del self._multiplexer._accumulators[run]
 
     @wrappers.Request.application
     def disablerun_route(self, request):
@@ -130,12 +124,11 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         }
         """
         run = request.args.get('run')
-        self._disable_run(run)
+        self.controller.disable_run(run)
         return http_util.Respond(request, {}, 'application/json')
 
     def _get_runs(self):
-        return io_helpers.get_run_names(self.logdir)
-
+        return io_helpers.get_run_names(self.controller.logdir)
 
     def _get_runstate(self, enable_new_runs=False):
         # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
@@ -174,41 +167,25 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
             # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
             # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
             if enable_new_runs:
-                self._add_runs(new_runs)
+                self.controller.enable_runs(new_runs)
         with self.profiler.TimeBlock("_multiplexer.Reload()"):
             self._multiplexer.Reload()
         
         # Update the runs with any new runs in the original logdir and remove any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
-
-    def _add_runs(self, runs):
-        for run in runs:
-            self._multiplexer._accumulators[run] = event_accumulator.EventAccumulator(
-                os.path.join(self.logdir, run),
-                size_guidance=self._multiplexer._size_guidance,
-                tensor_size_guidance=self._multiplexer._tensor_size_guidance,
-                purge_orphaned_data=self._multiplexer.purge_orphaned_data)
-            self._multiplexer._paths[run] = os.path.join(self.logdir, run)
  
     def _add_runs_matching_predicate(self, predicate):
         runs = [r for r in self.runs if predicate(r)]
         self.logger.log_message_info("number of runs to load: " + str(len(runs)))
         with self.profiler.TimeBlock("adding all the runs which match the predicate"):
-            self._add_runs(runs)
-
-    def _remove_runs(self, runs):
-        for run in runs:
-            if run in self._multiplexer._accumulators:
-                del self._multiplexer._accumulators[run]
-            if run in self._multiplexer._paths:
-                del self._multiplexer._paths[run]
+            self.controller.enable_runs(runs)
 
     def _remove_runs_matching_predicate(self, predicate):
         with self._multiplexer._accumulators_mutex:
             runs = [r for r in self.runs if predicate(r)]
             self.logger.log_message_info("number of runs to remove: " + str(len(runs)))
             with self.profiler.TimeBlock("removing all the runs which match predicate"):
-                self._remove_runs(runs)
+                self.controller.disable_runs(runs)
 
     def _format_regex(self, regex):
         regex = regex[1:-1]

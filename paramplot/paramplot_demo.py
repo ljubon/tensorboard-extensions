@@ -26,7 +26,7 @@ from tensorboard.plugins.scalar import summary
 from lib.config_writer import ParamPlotConfigWriter
 
 # Directory into which to write tensorboard data.
-LOGDIR = '/tmp/paramplotdemo2'
+LOGDIR = '/tmp/paramplotdemo'
 
 
 def run(logdir, run_name, tag_value_map, parameter_map):

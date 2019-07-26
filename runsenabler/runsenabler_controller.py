@@ -64,23 +64,23 @@ class FilesystemRunsController(RunsController):
             shutil.copy(str(metadata_file), str(new_run_path))
 
     def enable_run(self, run):
-        self._enable_run(run)
         self.base_controller.enable_run(run)
+        self._enable_run(run)
     
     def _disable_run(self, run):
         run_path = self.temp_logdir / run
         shutil.rmtree(str(run_path))
 
     def disable_run(self, run):
-        self._disable_run(run)
         self.base_controller.disable_run(run)
+        self._disable_run(run)
     
     def enable_runs(self, runs):
+        self.base_controller.enable_runs(runs)
         for run in runs:
             self._enable_run(run)
-        self.base_controller.enable_runs(runs)
     
     def disable_runs(self, runs):
+        self.base_controller.disable_runs(runs)
         for run in runs:
             self._disable_run(run)
-        self.base_controller.disable_runs(runs)

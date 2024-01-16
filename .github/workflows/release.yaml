@@ -1,0 +1,60 @@
+name: Release
+on:
+  push:
+  pull_request:
+    branches:
+    - "master"
+
+env: 
+  BAZEL_VERSION: 0.21.0
+  PYTHON_VERSION: 3.10.13
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: setup.py
+
+      - name: Cache bazel
+        uses: actions/cache@v3
+        with:
+          path: "~/.cache/bazel"
+          key: bazel
+
+      - uses: getsentry/action-setup-venv@v1.0.5
+        id: venv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          install-cmd: pip install wheel
+
+      - name: Install bazel
+        run: |
+          wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+          chmod +x bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
+          ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh --user
+
+      - name: Build and run pip packages
+        run: |
+          ~/bin/bazel build --incompatible_remove_native_http_archive=false --incompatible_package_name_is_a_function=false :gr_tensorboard
+          rm -rf assets/assets.zip
+          cp bazel-bin/assets.zip assets/assets.zip
+          python setup.py sdist bdist_wheel --python-tag py3
+          echo "y" | pip3 uninstall grtensorboard
+          pip3 install dist/grtensorboard-0.0.32-py3-none-any.whl
+
+      - uses: ncipollo/release-action@v1
+        # if: startsWith(github.ref, 'refs/tags/v') && github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+        with:
+          artifacts: "dist/*.tar.gz,dist/*.whl"
+          name: ${{ github.ref_name }}

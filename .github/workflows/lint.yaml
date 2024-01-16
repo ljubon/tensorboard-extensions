@@ -1,0 +1,27 @@
+name: Pylint
+
+on: [workflow_call]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - uses: getsentry/action-setup-venv@v1.0.5
+      id: venv
+      with:
+        python-version: ${{ matrix.python-version }}
+        install-cmd: pip install pylint
+
+    - name: Analysing the code with pylint
+      run: |
+        pylint $(git ls-files '*.py')

@@ -45,6 +45,7 @@ jobs:
           ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh --user
 
       - name: Build and run pip packages
+        id: build
         run: |
           ~/bin/bazel build --incompatible_remove_native_http_archive=false --incompatible_package_name_is_a_function=false :gr_tensorboard
           rm -rf assets/assets.zip
@@ -54,7 +55,8 @@ jobs:
           pip3 install dist/grtensorboard-0.0.32-py3-none-any.whl
 
       - uses: ncipollo/release-action@v1
-        # if: startsWith(github.ref, 'refs/tags/v') && github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+        name: Publish release - ${{ github.ref_name }} 
+        # if: success() && startsWith(github.ref, 'refs/tags/v') && github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
         with:
           artifacts: "dist/*.tar.gz,dist/*.whl"
           name: ${{ github.ref_name }}

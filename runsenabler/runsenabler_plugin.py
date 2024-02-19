@@ -1,28 +1,26 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
-import os
-import json
-import pprint
-import re
-
-import queue
-import threading
 import concurrent.futures
-
-import shutil
+import json
+import os
 import pathlib
-
-from werkzeug import wrappers
+import pprint
+import queue
+import re
+import shutil
+import threading
 from collections import deque
 
-from tensorboard.backend import http_util
-from tensorboard.plugins import base_plugin
-from tensorboard.backend.event_processing import plugin_event_accumulator as event_accumulator
-
 from gr_tensorboard.backend import io_helpers
-from .runsenabler_profiler import RunsEnablerLogger, RunsEnablerProfiler, NoOpLogger, NoOpProfiler
+from tensorboard.backend import http_util
+from tensorboard.backend.event_processing import \
+    plugin_event_accumulator as event_accumulator
+from tensorboard.plugins import base_plugin
+from werkzeug import wrappers
+
+from .runsenabler_profiler import (NoOpLogger, NoOpProfiler, RunsEnablerLogger,
+                                   RunsEnablerProfiler)
+
 
 class RunsEnablerPlugin(base_plugin.TBPlugin):
     """A plugin that controls which runs tensorboard can inspect"""
@@ -48,14 +46,17 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         self.printer = pprint.PrettyPrinter(indent=4)
         self.default_runs_regex = context.flags.default_runs_regex
         self.controller = controller
-        # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run 
+        # Load the multiplexer with runs for the first time so that we can reload the accumulators on every added run
         # and register all the plugins with gr tensorboard
         self._multiplexer.Reload()
         self.runs = self._get_runs()
 
-        # Create the runsenabler log file which contains profiling times for all the methods
-        self.logger = RunsEnablerLogger() if context.flags.enable_profiling else NoOpLogger()
-        self.profiler = RunsEnablerProfiler(self.logger) if context.flags.enable_profiling else NoOpProfiler()
+        # Create the runsenabler log file which contains profiling times for
+        # all the methods
+        self.logger = RunsEnablerLogger(
+        ) if context.flags.enable_profiling else NoOpLogger()
+        self.profiler = RunsEnablerProfiler(
+            self.logger) if context.flags.enable_profiling else NoOpProfiler()
 
     def get_plugin_apps(self):
         """Gets all routes offered by the plugin.
@@ -89,7 +90,8 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     @wrappers.Request.application
     def defaultregex_route(self, request):
-        return http_util.Respond(request, {"regex": self.default_runs_regex}, "application/json")
+        return http_util.Respond(request, {"regex": self.default_runs_regex},
+                                 "application/json")
 
     @wrappers.Request.application
     def enablerun_route(self, request):
@@ -131,20 +133,27 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         return io_helpers.get_run_names(self.controller.logdir)
 
     def _get_runstate(self, enable_new_runs=False):
-        # This assumes that the run names are entirely described by those sub directories which contains events files (1 per directory)
+        # This assumes that the run names are entirely described by those sub
+        # directories which contains events files (1 per directory)
         run_path_names = self._get_runs()
-        
-        # Determine the set of runs which have been newly added (i.e. in the new run set but not the old)
+
+        # Determine the set of runs which have been newly added (i.e. in the
+        # new run set but not the old)
         old_run_set = set(self.runs)
         new_run_set = set(run_path_names)
         newly_added_runs = new_run_set.difference(old_run_set)
-        
-        # Update the run state to reflect runs which have accumulators and also ones which have been newly added
-        new_run_state = {run: (run in self._multiplexer._accumulators or (enable_new_runs and run in newly_added_runs)) for run in run_path_names}
+
+        # Update the run state to reflect runs which have accumulators and also
+        # ones which have been newly added
+        new_run_state = {
+            run: (run in self._multiplexer._accumulators
+                  or (enable_new_runs and run in newly_added_runs))
+            for run in run_path_names
+        }
         self.runs = run_path_names
-        
+
         return new_run_state, newly_added_runs
-        
+
     @wrappers.Request.application
     def runstate_route(self, request):
         """Route to return the run state (dictionary mapping run names to whether they enabled)
@@ -161,30 +170,39 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         enable_new_runs = request.args.get('enableNewRuns')
 
         self.logger.log_message_info("executing runstate_route (/runs)")
-        with self.profiler.ProfileBlock(), self.profiler.TimeBlock("_get_runstate()"):
-            # Handles the case where new runs are added after tensorboard has begun 
+        with self.profiler.ProfileBlock(), self.profiler.TimeBlock(
+                "_get_runstate()"):
+            # Handles the case where new runs are added after tensorboard has
+            # begun
             self.run_state, new_runs = self._get_runstate(enable_new_runs)
             # If there are new runs and the user has specified to enable all new runs, then we will have these in the run state so create accumulators for these
-            # and reload the multiplexer to delete the runs whose directories have been removed and to create the runs whose directories have just added
+            # and reload the multiplexer to delete the runs whose directories
+            # have been removed and to create the runs whose directories have
+            # just added
             if enable_new_runs:
                 self.controller.enable_runs(new_runs)
         with self.profiler.TimeBlock("_multiplexer.Reload()"):
             self._multiplexer.Reload()
-        
-        # Update the runs with any new runs in the original logdir and remove any which have been deleted
+
+        # Update the runs with any new runs in the original logdir and remove
+        # any which have been deleted
         return http_util.Respond(request, self.run_state, 'application/json')
- 
+
     def _add_runs_matching_predicate(self, predicate):
         runs = [r for r in self.runs if predicate(r)]
-        self.logger.log_message_info("number of runs to load: " + str(len(runs)))
-        with self.profiler.TimeBlock("adding all the runs which match the predicate"):
+        self.logger.log_message_info("number of runs to load: " +
+                                     str(len(runs)))
+        with self.profiler.TimeBlock(
+                "adding all the runs which match the predicate"):
             self.controller.enable_runs(runs)
 
     def _remove_runs_matching_predicate(self, predicate):
         with self._multiplexer._accumulators_mutex:
             runs = [r for r in self.runs if predicate(r)]
-            self.logger.log_message_info("number of runs to remove: " + str(len(runs)))
-            with self.profiler.TimeBlock("removing all the runs which match predicate"):
+            self.logger.log_message_info("number of runs to remove: " +
+                                         str(len(runs)))
+            with self.profiler.TimeBlock(
+                    "removing all the runs which match predicate"):
                 self.controller.disable_runs(runs)
 
     def _format_regex(self, regex):
@@ -197,66 +215,86 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
 
     @wrappers.Request.application
     def enableall_route(self, request):
-        regex = self._format_regex(request.args.get('regex'))    
+        regex = self._format_regex(request.args.get('regex'))
         if regex:
-            self.logger.log_message_info("executing enableall_route (/enableall)")
+            self.logger.log_message_info(
+                "executing enableall_route (/enableall)")
             with self.profiler.ProfileBlock():
-                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and re.search(regex, run))
+                self._add_runs_matching_predicate(
+                    lambda run: run not in self._multiplexer._accumulators and
+                    re.search(regex, run))
 
         return http_util.Respond(request, {}, 'application/json')
-    
+
     @wrappers.Request.application
     def disableall_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
         if regex:
-            self.logger.log_message_info("executing disableall_route (/disableall)")
+            self.logger.log_message_info(
+                "executing disableall_route (/disableall)")
             with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and re.search(regex, run))
-            
+                self._remove_runs_matching_predicate(
+                    lambda run: run in self._multiplexer._accumulators and re.
+                    search(regex, run))
+
         return http_util.Respond(request, {}, 'application/json')
-    
+
     @wrappers.Request.application
     def disablenonmatching_route(self, request):
         regex = self._format_regex(request.args.get('regex'))
         if regex:
-            self.logger.log_message_info("executing disableallnonmatching_route (/disableallnonmatching)")
+            self.logger.log_message_info(
+                "executing disableallnonmatching_route (/disableallnonmatching)"
+            )
             with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and not re.search(regex, run))
-            
+                self._remove_runs_matching_predicate(
+                    lambda run: run in self._multiplexer._accumulators and
+                    not re.search(regex, run))
+
         return http_util.Respond(request, {}, 'application/json')
-    
+
     @wrappers.Request.application
     def enableallsubstring_route(self, request):
         subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
         if subregex:
-            self.logger.log_message_info("executing enableallsubstring_route (/enableallsubstring)")
+            self.logger.log_message_info(
+                "executing enableallsubstring_route (/enableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
+                self._add_runs_matching_predicate(
+                    lambda run: run not in self._multiplexer._accumulators and
+                    substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
-    
+
     @wrappers.Request.application
     def disableallsubstring_route(self, request):
         subregex = self._format_regex(request.args.get('subregex'))
         substring = request.args.get('substring')
         if subregex:
-            self.logger.log_message_info("executing disableallsubstring_route (/disableallsubstring)")
+            self.logger.log_message_info(
+                "executing disableallsubstring_route (/disableallsubstring)")
             with self.profiler.ProfileBlock():
-                self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
+                self._remove_runs_matching_predicate(
+                    lambda run: run in self._multiplexer._accumulators and
+                    substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
-    
+
     @wrappers.Request.application
     def disablealldisplayedgroups_route(self, request):
         subregex = self._format_regex(request.args.get('subregex'))
         substrings = json.loads(request.form.get("groups"))
         if subregex:
-            self.logger.log_message_info("executing disablealldisplayedgroups_route (/disablealldisplayedgroups)")
+            self.logger.log_message_info(
+                "executing disablealldisplayedgroups_route (/disablealldisplayedgroups)"
+            )
             with self.profiler.ProfileBlock():
                 for substring in substrings:
-                    self._remove_runs_matching_predicate(lambda run: run in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
-        
+                    self._remove_runs_matching_predicate(
+                        lambda run: run in self._multiplexer._accumulators and
+                        substring in run and re.search(subregex, run))
+
         return http_util.Respond(request, {}, 'application/json')
 
     @wrappers.Request.application
@@ -264,10 +302,13 @@ class RunsEnablerPlugin(base_plugin.TBPlugin):
         subregex = self._format_regex(request.args.get('subregex'))
         substrings = json.loads(request.form.get("groups"))
         if subregex:
-            self.logger.log_message_info("executing enablealldisplayedgroups_route (/enablealldisplayedgroups)")
+            self.logger.log_message_info(
+                "executing enablealldisplayedgroups_route (/enablealldisplayedgroups)"
+            )
             with self.profiler.ProfileBlock():
                 for substring in substrings:
-                    self._add_runs_matching_predicate(lambda run: run not in self._multiplexer._accumulators and substring in run and re.search(subregex, run))
+                    self._add_runs_matching_predicate(
+                        lambda run: run not in self._multiplexer._accumulators
+                        and substring in run and re.search(subregex, run))
 
         return http_util.Respond(request, {}, 'application/json')
-    

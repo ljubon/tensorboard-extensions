@@ -1,8 +1,7 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 from setuptools import find_packages, setup
+
 from version import VERSION
 
 CONSOLE_SCRIPTS = [
@@ -14,7 +13,8 @@ REQUIRED_PACKAGES = []
 setup(
     name='grtensorboard',
     version=VERSION,
-    description='GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
+    description=
+    'GR-Tensorboard provides some extensions to vanilla Tensorboard via plugins',
     long_description='',
     url='https://github.com/RMDev97/tensorboard-extensions',
     author='Ranjeev Menon',
@@ -51,5 +51,6 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     license='Apache 2.0',
-    keywords='gresearch tensorflow tensorboard tensor machine learning visualizer',
+    keywords=
+    'gresearch tensorflow tensorboard tensor machine learning visualizer',
 )

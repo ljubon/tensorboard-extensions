@@ -1,20 +1,17 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import json
-import os
-import tensorflow as tf
-import numpy as np
-from werkzeug import wrappers
-from functools import reduce
-import pprint
+from __future__ import absolute_import, division, print_function
 
 import collections
+import json
+import os
+import pprint
+from functools import reduce
 
+import numpy as np
+import tensorflow as tf
 from tensorboard.backend import http_util
 from tensorboard.backend.event_processing import event_multiplexer
 from tensorboard.plugins import base_plugin
+from werkzeug import wrappers
 
 
 class ParamPlotPlugin(base_plugin.TBPlugin):
@@ -41,26 +38,36 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         self._multiplexer = context.multiplexer
         self._context = context
 
-        # Default value for a parameter which does not exist for a particular run is nan
-        self._parameter_config = collections.defaultdict(lambda: collections.defaultdict(lambda: np.nan))
+        # Default value for a parameter which does not exist for a particular
+        # run is nan
+        self._parameter_config = collections.defaultdict(
+            lambda: collections.defaultdict(lambda: np.nan))
         self.parameters = set()
         self.printer = pprint.PrettyPrinter(indent=4)
 
     def _compute_config(self):
-        # Read in all the config files in each run and create the combined config
+        # Read in all the config files in each run and create the combined
+        # config
         for run_name in self._multiplexer.Runs().keys():
-            run_path = os.path.join(self._context.logdir, run_name, 'runparams.json')
+            run_path = os.path.join(self._context.logdir, run_name,
+                                    'runparams.json')
             if os.path.exists(run_path):
                 with open(run_path, 'r') as config_file_handle:
-                    self._parameter_config[run_name] = json.loads(config_file_handle.read())
+                    self._parameter_config[run_name] = json.loads(
+                        config_file_handle.read())
 
         # Calculate the list of parameters which have values
-        parameter_keys = [set(x.keys()) for x in self._parameter_config.values()]
+        parameter_keys = [
+            set(x.keys()) for x in self._parameter_config.values()
+        ]
         if parameter_keys:
             self.parameters = set.union(*parameter_keys)
 
     def _get_valid_runs(self):
-        return [run for run in self._multiplexer.Runs() if run in self._parameter_config]
+        return [
+            run for run in self._multiplexer.Runs()
+            if run in self._parameter_config
+        ]
 
     @wrappers.Request.application
     def tags_route(self, request):
@@ -113,13 +120,18 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         if not self._multiplexer:
             return False
 
-        # The plugin is active if there are any runs in the runparam dictionary which are in the logdir
+        # The plugin is active if there are any runs in the runparam dictionary
+        # which are in the logdir
         return bool(any(self._get_valid_runs()))
 
     def aggregate_tensor_events(self, tensor_events, aggregation):
-        event_list = [tf.make_ndarray(event.tensor_proto).item() for event in tensor_events]
-        events_ndarray = np.array(event_list) # Sam - could just wrap above list comp in np.array
-        
+        event_list = [
+            tf.make_ndarray(event.tensor_proto).item()
+            for event in tensor_events
+        ]
+        # Sam - could just wrap above list comp in np.array
+        events_ndarray = np.array(event_list)
+
         if aggregation == ParamPlotPlugin.MIN:
             return np.amin(events_ndarray)
         elif aggregation == ParamPlotPlugin.MAX:
@@ -131,50 +143,70 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
             event_result = max(tensor_events, key=(lambda ev: ev.wall_time))
             return tf.make_ndarray(event_result.tensor_proto).item()
 
-    def _get_tensor_events_payload_by_key(self, parameter, tag, aggregation, seriesKey):
-        processed_events = collections.defaultdict(lambda: collections.defaultdict(list))
+    def _get_tensor_events_payload_by_key(self, parameter, tag, aggregation,
+                                          seriesKey):
+        processed_events = collections.defaultdict(
+            lambda: collections.defaultdict(list))
 
-        # Loop through all the runs and compute the data which has parameter value as the independent variable and tensors as the dependent value
+        # Loop through all the runs and compute the data which has parameter
+        # value as the independent variable and tensors as the dependent value
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run].get(parameter, np.nan)
-            series_key_value = self._parameter_config[run].get(seriesKey, np.nan)
+            series_key_value = self._parameter_config[run].get(
+                seriesKey, np.nan)
 
             if not np.isnan(series_key_value):
-                # We want to return a dictionary which has a key for each series where the other parameters remain equal
-                param_key = "["+seriesKey+": "+str(series_key_value)+"]"
-                processed_events[param_key][param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
-        
-        # Aggregate the points so that there are only series which are keyed by the provided parameter name (seriesKey)
+                # We want to return a dictionary which has a key for each
+                # series where the other parameters remain equal
+                param_key = "[" + seriesKey + ": " + \
+                    str(series_key_value) + "]"
+                processed_events[param_key][param_value].append(
+                    self.aggregate_tensor_events(tensor_events, aggregation))
+
+        # Aggregate the points so that there are only series which are keyed by
+        # the provided parameter name (seriesKey)
         return {
-            param_key:  [
-                    (param_value, np.nanmean(np.array(processed_events[param_key][param_value])))
-                    for param_value in processed_events[param_key]
-                ]    
-                for param_key in processed_events
-            }
-    
+            param_key:
+            [(param_value,
+              np.nanmean(np.array(processed_events[param_key][param_value])))
+             for param_value in processed_events[param_key]]
+            for param_key in processed_events
+        }
+
     def _get_tensor_events_payload_no_key(self, parameter, tag, aggregation):
         processed_events = collections.defaultdict(list)
-        excluded_parameters = [param for param in self.parameters if not (parameter == param)]
+        excluded_parameters = [
+            param for param in self.parameters if not (parameter == param)
+        ]
 
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run].get(parameter, np.nan)
-            param_key = "".join([f"[{p}: {self._parameter_config[run].get(p, np.nan)}]" for p in excluded_parameters])
-            processed_events[param_key].append((param_value, self.aggregate_tensor_events(tensor_events, aggregation)))
-        
+            param_key = "".join([
+                f"[{p}: {self._parameter_config[run].get(p, np.nan)}]"
+                for p in excluded_parameters
+            ])
+            processed_events[param_key].append(
+                (param_value,
+                 self.aggregate_tensor_events(tensor_events, aggregation)))
+
         return processed_events
-    
-    def _get_tensor_events_payload_single_series(self, parameter, tag, aggregation):
+
+    def _get_tensor_events_payload_single_series(self, parameter, tag,
+                                                 aggregation):
         processed_events = collections.defaultdict(list)
-        
+
         for run in self._get_valid_runs():
             tensor_events = self._multiplexer.Tensors(run, tag)
             param_value = self._parameter_config[run].get(parameter, np.nan)
-            processed_events[param_value].append(self.aggregate_tensor_events(tensor_events, aggregation))
-        
-        return {"All": [(param_value, np.nanmean(np.array(tensors))) for param_value, tensors in processed_events.items()]}
+            processed_events[param_value].append(
+                self.aggregate_tensor_events(tensor_events, aggregation))
+
+        return {
+            "All": [(param_value, np.nanmean(np.array(tensors)))
+                    for param_value, tensors in processed_events.items()]
+        }
 
     @wrappers.Request.application
     def _paramdatabytag_route(self, request):
@@ -193,11 +225,14 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
         self._multiplexer.Reload()
 
         if seriesKey == "All":
-            response = self._get_tensor_events_payload_single_series(parameter, tag, aggregation)
+            response = self._get_tensor_events_payload_single_series(
+                parameter, tag, aggregation)
         elif seriesKey == "None":
-            response = self._get_tensor_events_payload_no_key(parameter, tag, aggregation)
+            response = self._get_tensor_events_payload_no_key(
+                parameter, tag, aggregation)
         else:
-            response = self._get_tensor_events_payload_by_key(parameter, tag, aggregation, seriesKey)
+            response = self._get_tensor_events_payload_by_key(
+                parameter, tag, aggregation, seriesKey)
 
         return http_util.Respond(request, response, 'application/json')
 
@@ -205,12 +240,10 @@ class ParamPlotPlugin(base_plugin.TBPlugin):
     def _parameters_route(self, request):
         """A route which returns the list of paramaters which each run is tagged with in the run parameters json file
 
-        Returns: A JSON object which is an array of parameter names 
+        Returns: A JSON object which is an array of parameter names
         """
         self._compute_config()
 
-        response = {
-            "payload": list(self.parameters)
-        }
+        response = {"payload": list(self.parameters)}
 
         return http_util.Respond(request, response, 'application/json')

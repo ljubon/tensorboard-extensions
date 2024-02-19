@@ -1,18 +1,11 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import tensorflow as tf
-
 
 PLUGIN_NAME = 'paramplot'
 
 
-def op(name,
-       value,
-       display_name=None,
-       description=None,
-       collections=None):
+def op(name, value, display_name=None, description=None, collections=None):
     """Create a TensorFlow summary op to record data associated with a particular the given guest.
 
     Arguments:
@@ -39,12 +32,10 @@ def op(name,
     summary_metadata = tf.SummaryMetadata(
         display_name=display_name,
         summary_description=description,
-        plugin_data=tf.SummaryMetadata.PluginData(
-            plugin_name=PLUGIN_NAME))
+        plugin_data=tf.SummaryMetadata.PluginData(plugin_name=PLUGIN_NAME))
 
     # Return a summary op that is properly configured.
-    return tf.summary.tensor_summary(
-        name,
-        value,
-        summary_metadata=summary_metadata,
-        collections=collections)
+    return tf.summary.tensor_summary(name,
+                                     value,
+                                     summary_metadata=summary_metadata,
+                                     collections=collections)
